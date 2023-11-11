@@ -1,0 +1,29 @@
+[package]
+name = "warband"
+version = "0.1.0"
+authors = ["pyrbin <git@pyrbin>"]
+edition = "2021"
+build = "build.rs"
+
+[features]
+debug = ["warband_lib/debug", "bevy/file_watcher"]
+
+[dependencies.bevy]
+default-features = true
+workspace = true
+
+[dependencies]
+warband_lib = { path = "../warband_lib" }
+
+# keep the following in sync with Bevy's dependencies
+winit = { version = "0.28", default-features = false }
+image = { version = "0.24", default-features = false }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bevy_dylib = { version = "0.12.0" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "*"
+
+[build-dependencies]
+embed-resource = "2.4.0"

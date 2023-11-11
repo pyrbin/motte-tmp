@@ -1,0 +1,48 @@
+[workspace]
+members = ["crates/*", "tools/*"]
+default-members = ["crates/warband", "crates/warband_lib"]
+resolver = "2"
+
+# Bevy
+[workspace.dependencies.bevy]
+default-features = false
+version = "0.12.0"
+
+# Lints
+[workspace.lints.rust]
+unused_must_use = "forbid"
+future_incompatible = "warn"
+nonstandard_style = "warn"
+rust_2018_idioms = "warn"
+incomplete_features = "allow"
+dead_code = "warn"
+elided_lifetimes_in_paths = "allow"
+
+[workspace.lints.clippy]
+all = "warn"
+dbg-macro = "warn"
+type_complexity = "allow"
+missing-docs-in-private-items = "warn"
+nursery = "warn"
+obfuscated-if-else = "warn"
+unimplemented = "warn"
+uninlined-format-args = "warn"
+unnested-or-patterns = "warn"
+redundant-pub-crate = "warn"
+
+[workspace.lints.rustdoc]
+private_intra_doc_links = "allow"
+redundant_explicit_links = "allow"
+
+[profile.dev.package."*"]
+codegen-units = 1
+debug = 1
+opt-level = 3
+
+[profile.dev]
+codegen-units = 512
+opt-level = 1
+
+[profile.release]
+codegen-units = 1
+lto = true

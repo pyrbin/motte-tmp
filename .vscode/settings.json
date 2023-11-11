@@ -1,0 +1,7 @@
+{
+    // enable when it supports 0.11.0: https://github.com/wgsl-analyzer/wgsl-analyzer/issues/88
+    "wgsl-analyzer.diagnostics.typeErrors": false,
+    "wgsl-analyzer.diagnostics.nagaParsing": false,
+    "wgsl-analyzer.diagnostics.nagaValidation": false,
+    "wgsl-analyzer.diagnostics.nagaVersion": "main", // either "0.11", "0.10", or "main"    
+}

@@ -1,0 +1,17 @@
+[package]
+name = "warband_macros"
+version = "0.1.0"
+authors = ["pyrbin <git@pyrbin>"]
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+bevy = { workspace = true }
+syn = "2.0.15"
+quote = "1.0"
+proc-macro2 = "1.0.63"
+proc-macro-crate = "1.3.1"
+proc-macro-error = "1.0.4"
+proc-macro-utils = "0.8.0"

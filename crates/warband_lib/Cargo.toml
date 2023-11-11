@@ -1,0 +1,56 @@
+[package]
+name = "warband_lib"
+version = "0.1.0"
+authors = ["pyrbin <git@pyrbin>"]
+edition = "2021"
+
+[features]
+default = ["debug"] # todo: remove
+debug = [
+    "dep:bevy-inspector-egui",
+#   "bevy/trace",
+    "bevy/bevy_gizmos", 
+    "bevy_xpbd_3d/debug-plugin"
+]
+
+[dependencies]
+warband_macros = { path = "../warband_macros" }
+# bevy plugins
+bevy_xpbd_3d = "0.3.2"
+bevy_asset_loader = { version = "0.18", features = ["2d","3d"] }
+# common
+bytemuck = "1.14.0"
+micromap = "0.0.14"
+smallvec = "1.11.1"
+git-version = "0.3.5"
+const_format = "0.2.5"
+lazy_static = "1.4.0"
+derive_more = "0.99"
+rand = "0.8.5"
+
+# debug
+bevy-inspector-egui = { version = "0.21.0", optional = true }
+
+[dependencies.bevy]
+workspace = true
+default-features = false
+features = [
+    "animation",
+    "bevy_asset",
+    "bevy_scene",
+    "bevy_winit",
+    "bevy_core_pipeline",
+    "bevy_pbr",
+    "bevy_gltf",
+    "bevy_render",
+    "bevy_sprite",
+    "bevy_text",
+    "bevy_ui",
+    "png",
+    "jpeg",
+    "hdr",
+    "zstd",
+    "x11",
+    "ktx2",
+]
+
