@@ -16,6 +16,7 @@ pub(crate) use warband_macros::*;
 
 pub(crate) use crate::{
     core::*,
+    physics::trait_ext::*,
     stats::stat::Stat,
     util::{trait_ext::*, *},
 };

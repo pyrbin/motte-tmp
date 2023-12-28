@@ -407,7 +407,7 @@ pub(crate) fn sync_blitter_camera(
         (Entity, &Blitter, &Camera, Option<&mut ScaleBias>, Option<&mut RenderTexture>),
         (Without<Pixelate>, With<Camera2d>),
     >,
-    mut images: ResMut<Assets<Image>>,
+    _images: ResMut<Assets<Image>>,
 ) {
     for (entity, blitter, camera, scale_bias, render_texture) in &mut blit_cameras {
         let Some(pixelate_camera) = **blitter else {
@@ -416,7 +416,7 @@ pub(crate) fn sync_blitter_camera(
 
         let Ok((
             pixelate_camera_data,
-            global_transform,
+            _global_transform,
             pixelate_render_texture,
             render_resolution,
             units_per_pixel,

@@ -18,7 +18,7 @@ pub use camera::*;
 use node::PixelateNode;
 use pipeline::PixelatePipeline;
 use snap::*;
-pub use snap::{snap, Snap, SnappedTranslation};
+pub use snap::{Snap, SnappedTranslation};
 
 pub(crate) mod constants {
     use bevy::prelude::UVec2;

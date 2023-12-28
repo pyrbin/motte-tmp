@@ -6,7 +6,7 @@ resolver = "2"
 # Bevy
 [workspace.dependencies.bevy]
 default-features = false
-version = "0.12.0"
+version = "0.12.1"
 
 # Lints
 [workspace.lints.rust]
@@ -22,6 +22,7 @@ elided_lifetimes_in_paths = "allow"
 all = "warn"
 dbg-macro = "warn"
 type_complexity = "allow"
+too_many_arguments = "allow"
 missing-docs-in-private-items = "warn"
 nursery = "warn"
 obfuscated-if-else = "warn"

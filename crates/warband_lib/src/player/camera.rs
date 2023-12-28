@@ -41,10 +41,10 @@ fn setup(mut commands: Commands, _asset_server: Res<AssetServer>) {
             DepthPrepass,
             NormalPrepass,
             camera::RigTransform::default(),
-            camera::Zoom::with_zoom(30.0),
-            camera::YawPitch::with_yaw_pitch(0.0, -55.0),
+            camera::Zoom::with_zoom(100.0),
+            camera::YawPitch::with_yaw_pitch(0.0, -90.0),
             camera::Smoothing::default().with_position(0.0).with_rotation(2.0).with_zoom(0.0),
-            pixelate::Pixelate::PixelsPerUnit(6),
+            pixelate::Pixelate::PixelsPerUnit(255),
             pixelate::SnapTransforms::On,
             pixelate::Snap::translation(),
             pixelate::SubPixelSmoothing::On,
@@ -93,9 +93,12 @@ fn controls(
             yaw_pitch.yaw = 180.0;
         }
 
-        for event in scroll.iter() {
+        const MAX_ZOOM: f32 = 100.0;
+        const MIN_ZOOM: f32 = 1.0;
+
+        for event in scroll.read() {
             let zoom_scale = zoom.zoom();
-            zoom.set_zoom((zoom_scale - event.y).clamp(1.0, 60.0));
+            zoom.set_zoom((zoom_scale - event.y).clamp(MIN_ZOOM, MAX_ZOOM));
         }
     }
 }

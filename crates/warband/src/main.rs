@@ -13,6 +13,7 @@ use bevy::{
 #[allow(unused_imports)]
 #[allow(clippy::single_component_path_imports)]
 use bevy_dylib;
+use bevy_embedded_assets::{EmbeddedAssetPlugin, PluginMode};
 
 pub fn name() -> &'static str {
     env!("CARGO_PKG_NAME")
@@ -42,10 +43,15 @@ pub fn main() {
                 backends: Some(bevy::render::settings::Backends::VULKAN),
                 ..default()
             }),
-            ..default()
         });
 
-    app.add_plugins((default_plugins, warband_lib::Plugin));
+    app.add_plugins(
+        default_plugins
+            .build()
+            .add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin { mode: PluginMode::ReplaceDefault }),
+    );
+
+    app.add_plugins(warband_lib::Plugin);
 
     #[cfg(not(target_arch = "wasm32"))]
     app.add_systems(Startup, set_window_icon);

@@ -6,8 +6,7 @@ use bevy::{
         render_asset::RenderAssets,
         render_graph::{NodeRunError, RenderGraphContext, ViewNode},
         render_resource::{
-            BindGroupDescriptor, BindGroupEntries, BindGroupEntry, BindingResource, Operations, PipelineCache,
-            RenderPassColorAttachment, RenderPassDescriptor,
+            BindGroupEntries, Operations, PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
         },
         renderer::RenderContext,
         view::ViewTarget,

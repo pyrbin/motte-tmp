@@ -2,6 +2,20 @@
 
 use crate::prelude::*;
 
+pub(crate) trait ColorExt {
+    /// Convert this type into a `Transform`.
+    fn lerp(&self, rhs: Color, s: f32) -> Color;
+}
+
+impl ColorExt for Color {
+    #[inline]
+    fn lerp(&self, rhs: Color, s: f32) -> Color {
+        let linear_self = self.as_rgba_linear();
+        let linear_rhs = rhs.as_rgba_linear();
+        linear_self * (1.0 - s) + linear_rhs * s
+    }
+}
+
 pub(crate) trait IntoTransform {
     /// Convert this type into a `Transform`.
     fn into_transform(self) -> Transform;
@@ -132,6 +146,7 @@ impl F32Ext for f32 {
 pub(crate) trait Vec2Ext: Copy {
     fn is_approx_zero(self) -> bool;
     fn x0y(self) -> Vec3;
+    fn x_y(self, y: f32) -> Vec3;
 }
 
 impl Vec2Ext for Vec2 {
@@ -143,6 +158,10 @@ impl Vec2Ext for Vec2 {
     #[inline]
     fn x0y(self) -> Vec3 {
         Vec3::new(self.x, 0., self.y)
+    }
+
+    fn x_y(self, y: f32) -> Vec3 {
+        Vec3::new(self.x, y, self.y)
     }
 }
 

@@ -5,9 +5,14 @@
 mod app_state;
 mod asset_management;
 mod core;
+mod flowfield;
 mod graphics;
+mod in_game;
+mod navigation;
+mod physics;
 mod player;
 mod stats;
+mod units;
 mod util;
 
 #[cfg(feature = "debug")]
@@ -21,17 +26,20 @@ impl bevy::app::Plugin for Plugin {
     fn build(&self, app: &mut App) {
         use crate::app_state::AppState;
         app_register_types!(AppState);
-
         app.add_state::<AppState>();
         app.add_plugins((
             #[cfg(feature = "debug")]
             debug::DebugPlugin,
             asset_management::AssetManagementPlugin,
-            PhysicsPlugins::default(),
+            physics::PhysicsPlugin,
+            navigation::NavigationPlugin,
+            units::UnitsPlugin,
             graphics::GraphicsPlugin,
             player::PlayerPlugin,
             core::CorePlugin,
             stats::StatsPlugin,
+            in_game::InGamePlugin,
+            flowfield::FlowFieldPlugin,
         ));
     }
 }

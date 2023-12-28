@@ -6,21 +6,21 @@ edition = "2021"
 build = "build.rs"
 
 [features]
-debug = ["warband_lib/debug", "bevy/file_watcher"]
+debug = ["warband_lib/debug"]
 
 [dependencies.bevy]
-default-features = true
 workspace = true
 
 [dependencies]
 warband_lib = { path = "../warband_lib" }
+bevy_embedded_assets = "0.9.1"
 
 # keep the following in sync with Bevy's dependencies
-winit = { version = "0.28", default-features = false }
+winit = { version = "0.28.7", default-features = false }
 image = { version = "0.24", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-bevy_dylib = { version = "0.12.0" }
+bevy_dylib = { version = "0.12.1" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "*"

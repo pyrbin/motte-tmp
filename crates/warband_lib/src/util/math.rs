@@ -26,8 +26,8 @@ pub fn world_space_ray_from_ndc(ndc: Vec2, camera: &Camera, camera_transform: &G
 
 #[allow(unused)]
 #[inline]
-pub fn random_point_in_square(radius: f32) -> Vec2 {
-    let x = random::<f32>() * radius * 2.0 - radius;
-    let y = random::<f32>() * radius * 2.0 - radius;
+pub fn random_point_in_square(size: f32) -> Vec2 {
+    let x = random::<f32>() * size - size / 2.0;
+    let y = random::<f32>() * size - size / 2.0;
     Vec2::new(x, y)
 }
