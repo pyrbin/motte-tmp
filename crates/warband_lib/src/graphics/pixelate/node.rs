@@ -21,10 +21,6 @@ use super::{
 #[derive(Default)]
 pub(super) struct PixelateNode {}
 
-impl PixelateNode {
-    pub const NAME: &'static str = "pixelate_node";
-}
-
 impl ViewNode for PixelateNode {
     type ViewQuery =
         (&'static ViewTarget, &'static RenderTexture, &'static DynamicUniformIndex<ScaleBias>, &'static Blitter);
@@ -68,7 +64,7 @@ impl ViewNode for PixelateNode {
                 resolve_target: None,
                 ops: Operations::default(),
             })],
-            depth_stencil_attachment: None,
+            ..Default::default()
         };
 
         let mut render_pass = render_context.command_encoder().begin_render_pass(&pass_descriptor);

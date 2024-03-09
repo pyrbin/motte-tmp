@@ -2,7 +2,7 @@ use bevy::{
     prelude::{FromWorld, Resource, World},
     render::{
         render_resource::{
-            BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BufferBindingType,
+            BindGroupLayout, BindGroupLayoutEntry, BindingType, BufferBindingType,
             CachedRenderPipelineId, ColorTargetState, ColorWrites, FilterMode, FragmentState, MultisampleState,
             PipelineCache, PrimitiveState, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor,
             ShaderStages, ShaderType, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
@@ -25,9 +25,9 @@ impl FromWorld for PixelatePipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
 
-        let layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: "pixelate_texture_bind_group_layout".into(),
-            entries: &[
+        let layout = render_device.create_bind_group_layout(
+            "pixelate_texture_bind_group_layout",
+            &[
                 // low-res screen texture
                 BindGroupLayoutEntry {
                     binding: 0,
@@ -58,7 +58,7 @@ impl FromWorld for PixelatePipeline {
                     count: None,
                 },
             ],
-        });
+        );
 
         let sampler = render_device.create_sampler(&SamplerDescriptor {
             label: None,

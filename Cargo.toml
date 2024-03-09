@@ -6,7 +6,7 @@ resolver = "2"
 # Bevy
 [workspace.dependencies.bevy]
 default-features = false
-version = "0.12.1"
+version = "0.13.0"
 
 # Lints
 [workspace.lints.rust]

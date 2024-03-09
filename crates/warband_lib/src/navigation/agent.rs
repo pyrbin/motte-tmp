@@ -1,43 +1,23 @@
-use super::pathing::{Path, PathTarget};
+use super::occupancy::Obstacle;
 use crate::{
-    app_state::AppState,
-    navigation::{avoidance::AvoidanceSystems, pathing::PathingSystems},
+    movement::motor::{Movement, Stationary},
     prelude::*,
 };
 
-const DESTINATION_ACCURACY: f32 = 0.1;
+pub const DEFAULT_AGENT_RADIUS: f32 = 1.0;
+pub const DEFAULT_AGENT_HEIGHT: f32 = 1.0;
+pub const DESTINATION_ACCURACY: f32 = 0.1;
 
-#[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum AgentSystems {
-    Movement,
-}
-
-pub struct AgentPlugin;
-
-impl Plugin for AgentPlugin {
-    fn build(&self, app: &mut App) {
-        app_register_types!(Agent, DesiredVelocity, TargetReachedCondition);
-
-        app.add_systems(Update, (agent_follow_path).chain().run_if(in_state(AppState::InGame)));
-        app.add_systems(
-            PostUpdate,
-            (agent_apply_velocity)
-                .chain()
-                .after(AvoidanceSystems::Apply)
-                .before(PhysicsSet::StepSimulation)
-                .run_if(in_state(AppState::InGame)),
-        );
-        app.add_systems(
-            PostUpdate,
-            (agent_finish_path).run_if(in_state(AppState::InGame)).after(PathingSystems::Pathing),
-        );
-    }
-}
-
-#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+#[derive(Component, Debug, Clone, Copy, Reflect)]
 #[reflect(Component)]
 pub struct Agent {
-    pub radius: f32,
+    radius: f32,
+}
+
+impl Default for Agent {
+    fn default() -> Self {
+        Self { radius: DEFAULT_AGENT_RADIUS }
+    }
 }
 
 impl Agent {
@@ -50,102 +30,123 @@ impl Agent {
     }
 }
 
+#[derive(Component, Clone, Copy, Deref, DerefMut, Default, From, Reflect)]
+pub struct Seek(pub Option<Direction2d>);
+
+impl Seek {
+    pub fn as_vec(&self) -> Vec2 {
+        self.0.map(|d| d.xy()).unwrap_or(Vec2::ZERO)
+    }
+}
+
+#[derive(Component, Clone, Copy, Deref, DerefMut, Default, From, Reflect)]
+pub struct TargetDistance(f32);
+
+#[derive(Stat, Component, Reflect)]
+pub struct Speed(f32);
+
+#[derive(Component, Debug, Clone, Copy, Deref, DerefMut, Default, Reflect)]
+pub struct DesiredVelocity(Vec2);
+
+#[derive(Component, Default, Reflect)]
+pub struct TargetReached;
+
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub enum TargetReachedCondition {
     Distance(f32),
-    VisibleAtDistance(f32),
 }
 
 impl TargetReachedCondition {
     #[inline]
-    pub fn has_reached_target(&self, agent: &Agent, path: &Path, position: Vec3) -> bool {
+    pub fn has_reached_target(&self, agent: &Agent, target_distance: f32) -> bool {
         match self {
             TargetReachedCondition::Distance(distance) => {
-                position.xz().distance(path.end().xz()) < (agent.radius + distance) + DESTINATION_ACCURACY
-            }
-            TargetReachedCondition::VisibleAtDistance(distance) => {
-                path.len() == 0
-                    && position.xz().distance(path.end().xz()) < (agent.radius + distance) + DESTINATION_ACCURACY
+                target_distance < (agent.radius + distance + DESTINATION_ACCURACY)
             }
         }
     }
 }
 
-#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
-#[reflect(Component)]
-pub struct Hold;
-
-#[derive(Component, Debug, Clone, Copy, Deref, DerefMut, Default, Reflect)]
-#[reflect(Component)]
-pub struct DesiredVelocity(pub Vec3);
-
-impl DesiredVelocity {
-    pub const ZERO: LinearVelocity = LinearVelocity(Vector::ZERO);
-    pub fn reset(&mut self) {
-        self.0 = Vec3::ZERO;
+pub(super) fn setup(mut commands: Commands, agents: Query<Entity, Added<Agent>>) {
+    for entity in &agents {
+        commands.entity(entity).insert((DesiredVelocity::default(), Seek(None), TargetDistance(0.0)));
     }
 }
 
-fn agent_follow_path(mut agents: Query<(Option<&Path>, &GlobalTransform, &mut DesiredVelocity), With<Agent>>) {
-    const MAX_SPEED: f32 = 400.;
-    agents.par_iter_mut().for_each(|(path, global_transform, mut desired_velocity)| {
-        if let Some(path) = path {
-            let position = global_transform.translation();
-            if let Some(&waypoint) = path.current() {
-                let direction = (waypoint - position).normalize();
-                **desired_velocity = direction * MAX_SPEED;
-            }
-        } else {
-            **desired_velocity = Vec3::ZERO;
+type MovingAgents = (With<Agent>, Without<TargetReached>);
+
+pub(super) fn seek(mut agents: Query<(Option<&Seek>, &Speed, &mut DesiredVelocity), MovingAgents>) {
+    agents.par_iter_mut().for_each(|(seek, speed, mut desired_velocity)| {
+        if let Some(seek) = seek
+            && let Some(dir) = **seek
+        {
+            **desired_velocity = dir.xy() * **speed;
         }
     });
 }
 
-fn agent_apply_velocity(time: Res<Time>, mut agents: Query<(&DesiredVelocity, &mut LinearVelocity), With<Agent>>) {
-    let delta_seconds = time.delta_seconds();
-    agents.par_iter_mut().for_each(|(desired_velocity, mut linvel)| {
+pub(super) fn apply_velocity(mut agents: Query<(&mut DesiredVelocity, &mut Movement), MovingAgents>) {
+    agents.par_iter_mut().for_each(|(mut desired_velocity, mut movement)| {
         if desired_velocity.is_approx_zero() {
             return;
         }
 
-        linvel.x += desired_velocity.x * delta_seconds;
-        linvel.z += desired_velocity.z * delta_seconds;
+        **movement = **desired_velocity;
+        desired_velocity.reset();
     });
 }
 
-fn agent_finish_path(
-    mut commands: Commands,
+// TODO: Obstacle if TargetReached or Stationary for x-amount of seconds & x-distance to goal.
+
+pub(super) fn target_reached(
+    commands: ParallelCommands,
+    mut agents: Query<(Entity, &Agent, &TargetDistance, &TargetReachedCondition, Has<TargetReached>), With<Agent>>,
+) {
+    agents.par_iter_mut().for_each(|(entity, agent, distance, target_reached_condition, target_reached)| {
+        commands.command_scope(|mut c| {
+            if target_reached_condition.has_reached_target(&agent, **distance) {
+                if !target_reached {
+                    c.entity(entity).insert(TargetReached);
+                }
+            } else if target_reached {
+                c.entity(entity).remove::<TargetReached>();
+            }
+        });
+    });
+}
+
+pub(super) fn obstacle(
+    commands: ParallelCommands,
     mut agents: Query<
-        (Entity, &Agent, &GlobalTransform, &mut DesiredVelocity, &mut Path, Option<&TargetReachedCondition>),
-        With<PathTarget>,
+        (
+            Entity,
+            &TargetDistance,
+            Has<Obstacle>,
+            Option<&ActiveDuration<Stationary>>,
+            Has<Stationary>,
+            Has<TargetReached>,
+        ),
+        With<Agent>,
     >,
 ) {
-    for (entity, agent, global_transform, mut desired_velocity, mut path, target_reached_condition) in &mut agents {
-        let agent_position = global_transform.translation();
-
-        let target_reached = if let Some(target_reached_condition) = target_reached_condition {
-            target_reached_condition.has_reached_target(agent, path.as_ref(), agent_position)
-        } else {
-            TargetReachedCondition::Distance(0.0).has_reached_target(agent, path.as_ref(), agent_position)
-        };
-
-        if target_reached {
-            desired_velocity.reset();
-            commands.entity(entity).remove::<(PathTarget, Path, TargetReachedCondition)>();
-            commands.entity(entity).insert(Hold);
-            continue;
-        }
-
-        if let Some(&waypoint) = path.current() {
-            let distance = waypoint.xz().distance(agent_position.xz());
-            let threshold = agent.radius + DESTINATION_ACCURACY;
-            if distance <= threshold {
-                path.pop();
-            }
-        } else {
-            desired_velocity.reset();
-            commands.entity(entity).remove::<(PathTarget, Path, TargetReachedCondition)>();
-            commands.entity(entity).insert(Hold);
-        }
-    }
+    agents.par_iter_mut().for_each(
+        |(entity, target_distance, has_obstacle, state_duration, is_stationary, target_reached)| {
+            commands.command_scope(|mut c| {
+                const MIN_STATIONARY_TIME: f32 = 5.0;
+                const MIN_TARGET_DISTANCE: f32 = 50.0;
+                let should_be_obstacle = target_reached
+                    || (**target_distance <= MIN_TARGET_DISTANCE
+                        && is_stationary
+                        && state_duration.is_some()
+                        && state_duration.unwrap().duration().as_secs_f32() >= MIN_STATIONARY_TIME);
+                if should_be_obstacle {
+                    if !has_obstacle {
+                        c.entity(entity).insert(Obstacle);
+                    }
+                } else if has_obstacle {
+                    c.entity(entity).remove::<Obstacle>();
+                }
+            });
+        },
+    );
 }

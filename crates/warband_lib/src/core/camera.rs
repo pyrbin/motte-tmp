@@ -62,20 +62,9 @@ fn reset_rig_transform(mut rig: Query<&mut RigTransform>) {
 pub struct RigTransform {
     pub translation: Vec3,
     pub rotation: Quat,
-
-    // only used for orthographic cameras
+    /// Only used for orthographic cameras
     pub zoom: Option<f32>,
 }
-
-impl RigTransform {
-    pub fn reset(&mut self) {
-        self.translation = Vec3::ZERO;
-        self.rotation = Quat::IDENTITY;
-        self.zoom = None;
-    }
-}
-
-// Driver components
 
 #[derive(Component, Reflect, Copy, Clone)]
 #[reflect(Component)]

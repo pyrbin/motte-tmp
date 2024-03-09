@@ -30,9 +30,9 @@ pub fn main() {
             primary_window: Some(Window {
                 title: format!("{} {}", name(), warband_lib::version()),
                 present_mode: PresentMode::AutoNoVsync,
-                fit_canvas_to_parent: true,
-                resolution: (1920., 1080.).into(),
-                // position: WindowPosition::Centered(MonitorSelection::Index(1)),
+                resolution: (1280., 720.).into(),
+                #[cfg(debug_assertions)]
+                position: WindowPosition::Centered(MonitorSelection::Index(1)),
                 ..default()
             }),
             ..default()
@@ -43,6 +43,7 @@ pub fn main() {
                 backends: Some(bevy::render::settings::Backends::VULKAN),
                 ..default()
             }),
+            ..default()
         });
 
     app.add_plugins(

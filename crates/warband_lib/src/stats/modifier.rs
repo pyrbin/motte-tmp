@@ -196,7 +196,7 @@ fn modifier_removed<M: Modifier<T>, T: Stat, S: Stat>(
     M: Component + Modifier<S>,
     S: Component,
 {
-    for _ in removed.iter().take(1) {
+    for _ in removed.read().take(1) {
         for entity in query.iter() {
             commands.entity(entity).insert(DirtyStat::<S>::default());
         }

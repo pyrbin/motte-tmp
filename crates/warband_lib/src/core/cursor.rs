@@ -21,7 +21,7 @@ impl Plugin for CursorPlugin {
             Update,
             (
                 update_position,
-                update_dragging.run_if(resource_exists_and_changed::<CursorPosition>()),
+                update_dragging.run_if(resource_exists_and_changed::<CursorPosition>),
                 update_button_input,
                 double_click,
             )
@@ -84,7 +84,7 @@ fn update_position(
     mut cursor_pos: ResMut<CursorPosition>,
     mut cursor_moved_events: EventReader<CursorMoved>,
 ) {
-    if let Some(last_mouse_position) = cursor_moved_events.iter().last() {
+    if let Some(last_mouse_position) = cursor_moved_events.read().last() {
         cursor_pos.position = last_mouse_position.position;
         if let Ok(window) = windows.get(last_mouse_position.window) {
             let window_size = Vec2::new(window.physical_width() as f32, window.physical_height() as f32);
@@ -122,12 +122,14 @@ fn update_button_input(
     mut drags: EventWriter<CursorDrag>,
     mut click: EventWriter<CursorClick>,
 ) {
-    for event in input_events.iter() {
+    for event in input_events.read() {
         match event.state {
             ButtonState::Released => {
                 if let Some((_, drag_state)) = cursor_button_state.0.remove_entry(&event.button) {
                     match drag_state {
-                        DragState::Pressed { ndc } => click.send(CursorClick { button: event.button, ndc }),
+                        DragState::Pressed { ndc } => {
+                            click.send(CursorClick { button: event.button, ndc });
+                        }
                         DragState::Dragging { start_ndc, current_ndc } => {
                             drags.send(CursorDrag::Released { button: event.button, start_ndc, end_ndc: current_ndc });
                         }
@@ -149,7 +151,7 @@ fn double_click(
     time: Res<Time>,
 ) {
     const DOUBLE_CLICK_THRESHOLD: f64 = 0.5;
-    for cursor_click in clicks.iter() {
+    for cursor_click in clicks.read() {
         let current_time = time.elapsed_seconds_f64();
         if last_click_position.map_or(true, |p| p.distance(cursor_click.ndc) < DRAGGING_THRESHOLD)
             && (current_time - *last_click_time) < DOUBLE_CLICK_THRESHOLD

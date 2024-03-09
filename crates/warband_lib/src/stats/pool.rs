@@ -33,8 +33,8 @@ impl<S: Stat + Component> From<f32> for PoolBundle<S> {
     }
 }
 
-#[derive(WorldQuery)]
-#[world_query(mutable)]
+#[derive(QueryData)]
+#[query_data(mutable, derive(Debug))]
 pub struct Pool<S: Stat + Component> {
     pub(super) current: &'static mut Current<S>,
     pub(super) total: &'static S,

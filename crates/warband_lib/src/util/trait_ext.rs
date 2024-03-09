@@ -58,7 +58,7 @@ pub(crate) trait LerpRadius {
 impl LerpRadius for f32 {
     #[inline]
     fn lerp_radius(self, other: Self, t: f32, radius: f32) -> Self {
-        let mut result = self.lerp(other, t);
+        let mut result = bevy::prelude::FloatExt::lerp(self, other, t);
         if (result - other).abs() < radius {
             result = other;
         }
@@ -174,6 +174,7 @@ pub(crate) struct SplitVec3 {
 pub(crate) trait Vec3Ext: Copy {
     fn is_approx_zero(self) -> bool;
     fn split(self, up: Vec3) -> SplitVec3;
+    fn x0z(self) -> Vec3;
 }
 
 impl Vec3Ext for Vec3 {
@@ -187,5 +188,21 @@ impl Vec3Ext for Vec3 {
         let vertical = up * self.dot(up);
         let horizontal = self - vertical;
         SplitVec3 { vertical, horizontal }
+    }
+
+    #[inline]
+    fn x0z(self) -> Vec3 {
+        Vec3::new(self.x, 0., self.z)
+    }
+}
+
+pub trait Reset: Default {
+    fn reset(&mut self);
+}
+
+impl<T: Default> Reset for T {
+    #[inline]
+    fn reset(&mut self) {
+        *self = T::default();
     }
 }

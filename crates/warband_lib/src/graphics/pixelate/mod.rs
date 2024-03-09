@@ -1,10 +1,10 @@
 use bevy::{
     asset::load_internal_asset,
-    core_pipeline::core_2d::{self, CORE_2D},
+    core_pipeline::core_2d::graph::{Core2d, Node2d},
     prelude::*,
     render::{
         extract_component::{ExtractComponentPlugin, UniformComponentPlugin},
-        render_graph::{RenderGraphApp, ViewNodeRunner},
+        render_graph::{RenderGraphApp, RenderLabel, ViewNodeRunner},
         RenderApp,
     },
 };
@@ -36,7 +36,8 @@ pub enum SnapSystem {
 
 const SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(6669923404675166368);
 
-pub const PIXELATE: &str = PixelateNode::NAME;
+#[derive(RenderLabel, Debug, Hash, PartialEq, Eq, Clone)]
+pub struct PixelateRenderLabel;
 
 pub struct PixelatePlugin;
 impl Plugin for PixelatePlugin {
@@ -90,10 +91,12 @@ impl Plugin for PixelatePlugin {
             return;
         };
 
-        use core_2d::graph::node::*;
         render_app
-            .add_render_graph_node::<ViewNodeRunner<PixelateNode>>(CORE_2D, PixelateNode::NAME)
-            .add_render_graph_edges(CORE_2D, &[CONTRAST_ADAPTIVE_SHARPENING, PIXELATE, END_MAIN_PASS_POST_PROCESSING]);
+            .add_render_graph_node::<ViewNodeRunner<PixelateNode>>(Core2d, PixelateRenderLabel)
+            .add_render_graph_edges(
+                Core2d,
+                (Node2d::ConstrastAdaptiveSharpening, PixelateRenderLabel, Node2d::EndMainPassPostProcessing),
+            );
     }
 
     fn finish(&self, app: &mut App) {

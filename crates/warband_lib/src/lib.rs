@@ -1,24 +1,26 @@
 #![feature(let_chains)]
 #![feature(if_let_guard)]
 #![feature(const_format_args)]
+#![feature(hash_extract_if)]
 
 mod app_state;
 mod asset_management;
 mod core;
-mod flowfield;
+mod flow_field;
 mod graphics;
 mod in_game;
+mod movement;
 mod navigation;
 mod physics;
 mod player;
 mod stats;
-mod units;
 mod util;
 
 #[cfg(feature = "debug")]
 mod debug;
 
 mod prelude;
+
 use prelude::*;
 
 pub struct Plugin;
@@ -26,20 +28,20 @@ impl bevy::app::Plugin for Plugin {
     fn build(&self, app: &mut App) {
         use crate::app_state::AppState;
         app_register_types!(AppState);
-        app.add_state::<AppState>();
+        app.init_state::<AppState>();
         app.add_plugins((
             #[cfg(feature = "debug")]
             debug::DebugPlugin,
             asset_management::AssetManagementPlugin,
             physics::PhysicsPlugin,
-            navigation::NavigationPlugin,
-            units::UnitsPlugin,
             graphics::GraphicsPlugin,
             player::PlayerPlugin,
             core::CorePlugin,
             stats::StatsPlugin,
             in_game::InGamePlugin,
-            flowfield::FlowFieldPlugin,
+            navigation::NavigationPlugin,
+            flow_field::FlowFieldPlugin,
+            movement::MovementPlugin,
         ));
     }
 }

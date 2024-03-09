@@ -3,18 +3,21 @@ use bevy::render::{
     texture::{ImageAddressMode, ImageSampler, ImageSamplerDescriptor},
 };
 
+use self::cursor::{CursorClick, CursorPosition};
 use crate::{
     app_state::AppState,
     asset_management::ImageAssets,
+    flow_field::{goal::Goal, CellIndex, FieldLayout, FlowField},
     graphics::pixelate,
+    movement::motor::CharacterMotor,
     navigation::{
-        agent::{Agent, DesiredVelocity, Hold, TargetReachedCondition},
+        agent::{Agent, DesiredVelocity, Speed, TargetReachedCondition, DEFAULT_AGENT_HEIGHT, DEFAULT_AGENT_RADIUS},
         avoidance::Avoidance,
-        pathing::PathTarget,
+        occupancy::Obstacle,
     },
-    physics::character_controller::CharacterControllerBundle,
     player::camera::MainCamera,
-    prelude::{cursor::CursorDoubleClick, *},
+    prelude::*,
+    util::math::random_point_in_square,
 };
 
 pub struct InGamePlugin;
@@ -22,7 +25,7 @@ pub struct InGamePlugin;
 impl Plugin for InGamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(AppState::InGame), setup);
-        app.add_systems(Update, move_to);
+        app.add_systems(Update, click);
     }
 }
 
@@ -40,10 +43,10 @@ fn setup(
     });
 
     // Plane
-    let plane_size = 96.0;
+    let plane_size = 200.0;
     let half_plane_size = plane_size / 2.0;
 
-    let mut mesh_plane = Mesh::from(shape::Plane { size: plane_size, subdivisions: 16 });
+    let mut mesh_plane = Mesh::from(Plane3d::default().mesh().size(plane_size, plane_size));
     match mesh_plane.attribute_mut(Mesh::ATTRIBUTE_UV_0).unwrap() {
         VertexAttributeValues::Float32x2(uvs) => {
             for uv in uvs {
@@ -76,79 +79,93 @@ fn setup(
         Name::new("plane"),
         PbrBundle {
             mesh: meshes.add(mesh_plane),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(panel),
-                unlit: true,
-                ..Default::default()
-            }),
+            material: materials.add(StandardMaterial { base_color_texture: Some(panel), unlit: true, ..default() }),
             transform: Transform::IDENTITY,
             ..default()
         },
         Collider::cuboid(plane_size, 0.1, plane_size),
         pixelate::Snap::translation(),
         RigidBody::Static,
-        oxidized_navigation::NavMeshAffector,
     ));
 
-    commands.spawn((
-        Name::new("wall"),
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 8.0 })),
-            material: materials.add(Color::BLUE.into()),
-            transform: (Vec3::X * (half_plane_size - 10.0) + Vec3::Z * (half_plane_size - 10.0)).into_transform(),
-            ..default()
-        },
-        Collider::cuboid(8.0, 8.0, 8.0),
-        pixelate::Snap::translation(),
-        RigidBody::Static,
-        oxidized_navigation::NavMeshAffector,
-    ));
-
-    let avoidance = 3.0;
-    for i in 0..10 {
-        let mouse_button = if i % 2 == 0 { MouseButton::Left } else { MouseButton::Right };
-        let color = if i % 2 == 0 { Color::GREEN.into() } else { Color::RED.into() };
-        let name = if i % 2 == 0 { "green" } else { "red" };
-
-        let point = math::random_point_in_square(half_plane_size - 5.0);
-        commands.spawn((
-            Name::new(format!("agent {} ({})", i, name)),
+    let target = commands
+        .spawn((
+            Name::new("target"),
             PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-                material: materials.add(color),
-                transform: Vec3::new(point.x, 0.5, point.y).into_transform(),
+                mesh: meshes.add(Mesh::from(Sphere::new(1.0).mesh().ico(5).unwrap())),
+                material: materials.add(Color::BLUE),
+                transform: Vec3::ZERO.into_transform(),
                 ..default()
             },
+            Position::default(),
+            CellIndex::default(),
+            FlowField::default(),
+        ))
+        .id();
+
+    for i in 0..50 {
+        let translation = random_point_in_square(100.0);
+        let radius = thread_rng().gen_range(2.0..5.0);
+        let height = thread_rng().gen_range(2.0..5.0);
+        commands.spawn((
+            Name::new(format!("obstacle {i}")),
+            PbrBundle {
+                mesh: meshes.add(Mesh::from(Capsule3d::new(radius, height))),
+                material: materials.add(Color::RED.with_a(0.5)),
+                transform: Vec3::new(translation.x, 0.0, translation.y).into_transform(),
+                ..default()
+            },
+            Collider::from(Capsule3d::new(radius, height)),
             pixelate::Snap::translation(),
-            GravityScale(2.0),
-            Group(mouse_button),
-            CharacterControllerBundle::new(Collider::cuboid_splat(1.0)).with_movement(0.92, 7.0, 30.0_f32.to_radians()),
-            Agent::default().with_radius(1.0),
-            Avoidance::default().with_neighbourhood(avoidance),
-            DesiredVelocity(Vec3::ZERO),
+            CellIndex::default(),
+            RigidBody::Static,
+            Obstacle,
+            LinearVelocity::ZERO,
+        ));
+    }
+    const RADIUS: f32 = 1.0;
+    const HALF_RADIUS: f32 = RADIUS / 2.0;
+    for i in 0..1 {
+        let translation = random_point_in_square(200.0);
+        let transform = Vec3::new(translation.x, 3.0, translation.y).into_transform();
+        commands.spawn((
+            Name::new(format!("agent {i}")),
+            PbrBundle {
+                mesh: meshes.add(Mesh::from(Capsule3d { radius: HALF_RADIUS, half_length: RADIUS })),
+                material: materials.add(Color::GREEN),
+                transform,
+                ..default()
+            },
+            CharacterMotor::capsule(RADIUS, HALF_RADIUS),
+            pixelate::Snap::translation(),
+            Goal::Entity(target.into()),
+            CellIndex::default(),
+            Agent::default().with_radius(RADIUS),
+            TargetReachedCondition::Distance(1.),
+            Avoidance::default().with_neighbourhood(5.0),
+            DesiredVelocity::default(),
+            Speed::base(200.0),
         ));
     }
 }
 
-#[derive(Component, DerefMut, Deref)]
-struct Group(pub(self) MouseButton);
-
-fn move_to(
-    mut commands: Commands,
-    agents: Query<(Entity, &Group), With<Agent>>,
-    mut cursor: EventReader<CursorDoubleClick>,
+fn click(
+    cursor: Res<CursorPosition>,
+    mut event_reader: EventReader<CursorClick>,
+    mut fields: Query<(&mut Transform, &mut CellIndex, &FlowField)>,
     main_cam: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
+    field_layout: Res<FieldLayout>,
 ) {
-    let (camera, camera_transform) = main_cam.get_single().expect("there should be a main camera");
-    for click in cursor.read() {
-        let (origin, direction) = math::world_space_ray_from_ndc(click.ndc, camera, camera_transform);
-        let position = math::plane_intersection(origin, direction, Vec3::ZERO, Vec3::Y);
-        for (agent, group) in agents.iter() {
-            if **group != click.button {
-                continue;
-            }
-            commands.entity(agent).insert(PathTarget::Position(position)).insert(TargetReachedCondition::Distance(5.0));
-            commands.entity(agent).remove::<Hold>();
+    for cursor_click in event_reader.read() {
+        if !matches!(cursor_click.button, MouseButton::Right) {
+            continue;
+        }
+        for (mut transform, mut cell_index, _) in &mut fields {
+            let (camera, camera_transform) = main_cam.get_single().expect("there should be a main camera");
+            let (origin, direction) = math::world_space_ray_from_ndc(cursor.ndc(), camera, camera_transform);
+            let position = math::plane_intersection(origin, direction, Vec3::ZERO, Vec3::Y);
+            transform.translation = position;
+            **cell_index = field_layout.world_to_cell(position);
         }
     }
 }

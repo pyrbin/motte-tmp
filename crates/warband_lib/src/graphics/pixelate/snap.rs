@@ -176,8 +176,8 @@ pub(crate) fn snap_camera(
         *global_transform = affine.into();
 
         // to trigger a tranform propagation
-        // this will reset the snapped position.s
-        transform.set_changed();
+        // this will reset the snapped positions
+        // transform.set_changed();
 
         if let Some(ref mut snap_offset) = snap_offset {
             snap_offset.0 = offset;
@@ -192,19 +192,14 @@ pub(crate) fn snap_camera(
 /// supports a single camera with [`SnapTransforms::On`], will panic if more than one is found. This
 /// has to run after [`bevy::transform::TransformSystem::TransformPropagate`] to work & assure
 /// safety.
-// perf: we could probably improve performance by storing the snapped transforms in a separate component & only update
-// on Changed<Transform>
 #[inline]
 pub(super) fn snap_transforms(
     cameras: Query<(Entity, &GlobalTransform, &UnitsPerPixel, &SnapTransforms), With<OrthographicFixedVertical>>,
     mut snappable: Query<
-        (&mut GlobalTransform, &mut SnappedTranslation, &mut Transform, &Snap, Option<&Children>),
+        (&mut GlobalTransform, &mut SnappedTranslation, &Transform, &Snap, Option<&Children>),
         Without<SnapTransforms>,
     >,
-    descendents: Query<
-        (&mut GlobalTransform, &mut Transform, Option<&Children>),
-        (Without<Snap>, Without<SnapTransforms>),
-    >,
+    descendents: Query<(&mut GlobalTransform, &Transform, Option<&Children>), (Without<Snap>, Without<SnapTransforms>)>,
 ) {
     // perf: is there a better way to do this other than `collect`?
     let valid_cameras: Vec<_> =
@@ -228,31 +223,29 @@ pub(super) fn snap_transforms(
     let cam_to_world = cam_global_transform.affine();
     let world_to_cam = cam_to_world.inverse();
 
-    snappable.par_iter_mut().for_each(
-        |(mut global_transform, mut snapped_translation, mut transform, snap, children)| {
-            let mut affine = global_transform.affine();
-            let _ = snap_to_camera_projection_grid(snap, &cam_to_world, &world_to_cam, units_per_pixel, &mut affine);
+    snappable.par_iter_mut().for_each(|(mut global_transform, mut snapped_translation, transform, snap, children)| {
+        let mut affine = global_transform.affine();
+        let _ = snap_to_camera_projection_grid(snap, &cam_to_world, &world_to_cam, units_per_pixel, &mut affine);
 
-            **snapped_translation = affine.translation;
-            *global_transform = affine.into();
+        **snapped_translation = affine.translation;
+        *global_transform = affine.into();
 
-            // to trigger a tranform propagation
-            // this will reset the snapped position.
-            transform.set_changed();
+        // to trigger a tranform propagation
+        // this will reset the snapped position.
+        // transform.set_changed();
 
-            let Some(children) = children else {
-                return;
-            };
+        let Some(children) = children else {
+            return;
+        };
 
-            for &child in children {
-                // SAFETY: Save as long as [`propagate_transforms`] & [`sync_simple_transforms`] is
-                // ran before this.
-                unsafe {
-                    snap_transforms_recursive(snap, cam_to_world, world_to_cam, units_per_pixel, &descendents, child);
-                }
+        for &child in children {
+            // SAFETY: Save as long as [`propagate_transforms`] & [`sync_simple_transforms`] is
+            // ran before this.
+            unsafe {
+                snap_transforms_recursive(snap, cam_to_world, world_to_cam, units_per_pixel, &descendents, child);
             }
-        },
-    );
+        }
+    });
 }
 
 /// Recursively snap the transform of an entity and its children.
@@ -264,14 +257,11 @@ unsafe fn snap_transforms_recursive(
     cam_to_world: Affine3A,
     world_to_cam: Affine3A,
     units_per_pixel: f32,
-    transforms: &Query<
-        (&mut GlobalTransform, &mut Transform, Option<&Children>),
-        (Without<Snap>, Without<SnapTransforms>),
-    >,
+    transforms: &Query<(&mut GlobalTransform, &Transform, Option<&Children>), (Without<Snap>, Without<SnapTransforms>)>,
     entity: Entity,
 ) {
     let children = {
-        let Ok((mut global_transform, mut transform, children)) =
+        let Ok((mut global_transform, transform, children)) =
             // SAFETY: This call cannot create aliased mutable references.
             (unsafe { transforms.get_unchecked(entity) })
         else {
@@ -286,7 +276,7 @@ unsafe fn snap_transforms_recursive(
 
         // to trigger a tranform propagation
         // this will reset the snapped position.
-        transform.set_changed();
+        // transform.set_changed();
 
         children
     };
