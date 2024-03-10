@@ -150,15 +150,8 @@ pub(crate) fn snap_camera(
         With<OrthographicFixedVertical>,
     >,
 ) {
-    for (
-        entity,
-        mut global_transform,
-        mut transform,
-        snap,
-        mut snapped_translation,
-        units_per_pixel,
-        mut snap_offset,
-    ) in &mut cameras
+    for (entity, mut global_transform, _transform, snap, mut snapped_translation, units_per_pixel, mut snap_offset) in
+        &mut cameras
     {
         let Some(units_per_pixel) = units_per_pixel.get_value() else {
             warn!("No units per pixel found for camera: {:?}", entity);
@@ -199,9 +192,8 @@ pub(super) fn snap_transforms(
         (&mut GlobalTransform, &mut SnappedTranslation, &Transform, &Snap, Option<&Children>),
         Without<SnapTransforms>,
     >,
-    descendents: Query<(&mut GlobalTransform, &Transform, Option<&Children>), (Without<Snap>, Without<SnapTransforms>)>,
+    descendants: Query<(&mut GlobalTransform, &Transform, Option<&Children>), (Without<Snap>, Without<SnapTransforms>)>,
 ) {
-    // perf: is there a better way to do this other than `collect`?
     let valid_cameras: Vec<_> =
         cameras.iter().filter(|(_, _, _, snap_transforms)| matches!(snap_transforms, SnapTransforms::On)).collect();
 
@@ -223,7 +215,7 @@ pub(super) fn snap_transforms(
     let cam_to_world = cam_global_transform.affine();
     let world_to_cam = cam_to_world.inverse();
 
-    snappable.par_iter_mut().for_each(|(mut global_transform, mut snapped_translation, transform, snap, children)| {
+    snappable.par_iter_mut().for_each(|(mut global_transform, mut snapped_translation, _transform, snap, children)| {
         let mut affine = global_transform.affine();
         let _ = snap_to_camera_projection_grid(snap, &cam_to_world, &world_to_cam, units_per_pixel, &mut affine);
 
@@ -242,7 +234,7 @@ pub(super) fn snap_transforms(
             // SAFETY: Save as long as [`propagate_transforms`] & [`sync_simple_transforms`] is
             // ran before this.
             unsafe {
-                snap_transforms_recursive(snap, cam_to_world, world_to_cam, units_per_pixel, &descendents, child);
+                snap_transforms_recursive(snap, cam_to_world, world_to_cam, units_per_pixel, &descendants, child);
             }
         }
     });
@@ -261,7 +253,7 @@ unsafe fn snap_transforms_recursive(
     entity: Entity,
 ) {
     let children = {
-        let Ok((mut global_transform, transform, children)) =
+        let Ok((mut global_transform, _transform, children)) =
             // SAFETY: This call cannot create aliased mutable references.
             (unsafe { transforms.get_unchecked(entity) })
         else {

@@ -7,12 +7,12 @@ use self::cursor::{CursorClick, CursorPosition};
 use crate::{
     app_state::AppState,
     asset_management::ImageAssets,
-    flow_field::{goal::Goal, CellIndex, FieldLayout, FlowField},
+    flow_field::{goal::Goal, CellIndex, CostField, FieldLayout, FlowField},
     graphics::pixelate,
     movement::motor::CharacterMotor,
     navigation::{
-        agent::{Agent, DesiredVelocity, Speed, TargetReachedCondition, DEFAULT_AGENT_HEIGHT, DEFAULT_AGENT_RADIUS},
-        avoidance::Avoidance,
+        agent::{Agent, DesiredVelocity, Speed, TargetReachedCondition},
+        avoidance::{Avoidance, AvoidanceOptions},
         occupancy::Obstacle,
     },
     player::camera::MainCamera,
@@ -26,6 +26,17 @@ impl Plugin for InGamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(AppState::InGame), setup);
         app.add_systems(Update, click);
+
+        const DEFAULT_SIZE: usize = 100;
+        const DEFAULT_CELL_SIZE: f32 = 1.0;
+        app.insert_resource(FieldLayout::default().with_size(DEFAULT_SIZE).with_cell_size(DEFAULT_CELL_SIZE));
+        app.insert_resource(CostField::new(DEFAULT_SIZE));
+        app.insert_resource(AvoidanceOptions {
+            obstacle_margin: None,
+            agent_neighborhood: Some(1.5),
+            time_horizon: 1.0,
+            obstacle_time_horizon: 0.5,
+        });
     }
 }
 
@@ -44,7 +55,7 @@ fn setup(
 
     // Plane
     let plane_size = 200.0;
-    let half_plane_size = plane_size / 2.0;
+    let _half_plane_size = plane_size / 2.0;
 
     let mut mesh_plane = Mesh::from(Plane3d::default().mesh().size(plane_size, plane_size));
     match mesh_plane.attribute_mut(Mesh::ATTRIBUTE_UV_0).unwrap() {
@@ -92,21 +103,24 @@ fn setup(
         .spawn((
             Name::new("target"),
             PbrBundle {
-                mesh: meshes.add(Mesh::from(Sphere::new(1.0).mesh().ico(5).unwrap())),
-                material: materials.add(Color::BLUE),
-                transform: Vec3::ZERO.into_transform(),
+                mesh: meshes.add(Sphere::new(5.0).mesh().ico(5).unwrap()),
+                material: materials.add(Color::BLUE.with_a(0.33)),
+                transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
                 ..default()
             },
+            Collider::from(Sphere::new(5.0)),
+            RigidBody::Static,
+            Obstacle,
             Position::default(),
             CellIndex::default(),
             FlowField::default(),
         ))
         .id();
 
-    for i in 0..50 {
-        let translation = random_point_in_square(100.0);
-        let radius = thread_rng().gen_range(2.0..5.0);
-        let height = thread_rng().gen_range(2.0..5.0);
+    for i in 0..16 {
+        let translation = random_point_in_square(50.0);
+        let radius = thread_rng().gen_range(2.0..3.0);
+        let height = thread_rng().gen_range(2.0..6.0);
         commands.spawn((
             Name::new(format!("obstacle {i}")),
             PbrBundle {
@@ -125,9 +139,9 @@ fn setup(
     }
     const RADIUS: f32 = 1.0;
     const HALF_RADIUS: f32 = RADIUS / 2.0;
-    for i in 0..1 {
-        let translation = random_point_in_square(200.0);
-        let transform = Vec3::new(translation.x, 3.0, translation.y).into_transform();
+    for i in 0..50 {
+        let translation = random_point_in_square(100.0);
+        let transform = Vec3::new(translation.x, 50.0, translation.y).into_transform();
         commands.spawn((
             Name::new(format!("agent {i}")),
             PbrBundle {
@@ -138,13 +152,13 @@ fn setup(
             },
             CharacterMotor::capsule(RADIUS, HALF_RADIUS),
             pixelate::Snap::translation(),
-            Goal::Entity(target.into()),
+            Goal::Entity(target),
             CellIndex::default(),
             Agent::default().with_radius(RADIUS),
             TargetReachedCondition::Distance(1.),
-            Avoidance::default().with_neighbourhood(5.0),
+            Avoidance::default().with_neighborhood(2.0),
             DesiredVelocity::default(),
-            Speed::base(200.0),
+            Speed::base(500.0),
         ));
     }
 }

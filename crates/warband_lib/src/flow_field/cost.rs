@@ -3,7 +3,6 @@ use bevy::{
         entity::EntityHashMap,
         system::{CommandQueue, SystemState},
     },
-    render::render_graph::RenderLabel,
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
 };
 use parry2d::{
@@ -45,10 +44,10 @@ impl Default for CostField {
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Reflect)]
 pub enum Cost {
-    Blocked,
-    Occupied,
     #[default]
     Traversable,
+    Blocked,
+    Occupied,
 }
 
 impl Cost {
@@ -95,31 +94,26 @@ pub(super) fn occupancy_cells(
 ) {
     obstacles.par_iter_mut().for_each(|(mut occupied_cells, occupancy, aabb)| {
         occupied_cells.clear();
-        match occupancy {
-            Occupancy::Occupied(shape) => {
-                let min_cell = field_layout.world_to_cell(aabb.min.x0y());
-                let max_cell = field_layout.world_to_cell(aabb.max.x0y());
 
-                // fix: annoying conversion
-                let shape = shape
-                    .iter()
-                    .map(|v| OPoint::<f32, Const<2>>::from_slice(&[v.x as f32, v.y as f32]))
-                    .collect::<Vec<_>>();
-                for x in min_cell.x()..=max_cell.x() {
-                    for y in min_cell.y()..=max_cell.y() {
-                        let cell = Cell::new(x, y);
-                        let world_position = field_layout.cell_to_world(cell);
-                        if point_in_poly2d(
-                            &OPoint::from_slice(&[world_position.x as f32, world_position.z as f32]),
-                            &shape,
-                        ) {
-                            occupied_cells.push(cell);
-                        }
-                    }
+        let Some(shape) = occupancy.shape() else {
+            return;
+        };
+
+        let min_cell = field_layout.world_to_cell(aabb.min.x0y());
+        let max_cell = field_layout.world_to_cell(aabb.max.x0y());
+
+        // FIXME: annoying glam to nalgebra conversion
+        let shape = shape.iter().map(|v| OPoint::<f32, Const<2>>::from_slice(&[v.x, v.y])).collect::<Vec<_>>();
+
+        for x in min_cell.x()..=max_cell.x() {
+            for y in min_cell.y()..=max_cell.y() {
+                let cell = Cell::new(x, y);
+                let world_position = field_layout.cell_to_world(cell);
+                if point_in_poly2d(&OPoint::from_slice(&[world_position.x, world_position.z]), &shape) {
+                    occupied_cells.push(cell);
                 }
             }
-            _ => {}
-        };
+        }
     });
 }
 
@@ -129,6 +123,7 @@ pub(super) fn obstacles(
     mut dirty_cells: ResMut<DirtyCells>,
     mut obstacles: Query<(Entity, &OccupancyCells), (Changed<OccupancyCells>, With<Obstacle>)>,
 ) {
+    // perf: par_iter() this?
     obstacles.iter_mut().for_each(|(entity, occupied_cells)| {
         if occupied_cells.is_empty() {
             if let Some(cells) = cell_occupants_reverse.get_mut(&entity) {
@@ -216,6 +211,8 @@ pub(super) fn update(
     mut cost_update_tasks: ResMut<CostUpdateTasks>,
     mut dirty_cells: ResMut<DirtyCells>,
 ) {
+    // perf: handle in batches if update rates are high
+
     if dirty_cells.is_empty() {
         return;
     }
@@ -239,7 +236,7 @@ pub(super) fn update(
             cost_field.set_changed();
 
             let Ok(mut cost_field) = cost_field.write() else {
-                error!("CostField lock has been poisoned. Cost updates can no longer be continued.");
+                error!(target: "cost_field", "lock has been poisoned. Cost updates can no longer be continued.");
                 return;
             };
 
@@ -289,6 +286,15 @@ pub(super) fn poll_update_tasks(mut commands: Commands, mut cost_update_tasks: R
     });
 }
 
-pub(super) fn layout_resize(cost_field: ResMut<super::CostField>, field_layout: Res<FieldLayout>) {
+pub(super) fn layout_resize(
+    mut cell_occupants: ResMut<CellOccupants>,
+    mut cell_occupants_reverse: ResMut<CellOccupantsReverse>,
+    mut cost_field: ResMut<super::CostField>,
+    field_layout: Res<FieldLayout>,
+) {
+    cell_occupants.clear();
+    cell_occupants_reverse.clear();
     cost_field.write().unwrap().resize(field_layout.size());
+    cost_field.set_changed();
+    // TODO: update cost of every cell
 }

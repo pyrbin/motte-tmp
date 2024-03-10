@@ -96,15 +96,13 @@ pub(super) fn apply_velocity(mut agents: Query<(&mut DesiredVelocity, &mut Movem
     });
 }
 
-// TODO: Obstacle if TargetReached or Stationary for x-amount of seconds & x-distance to goal.
-
 pub(super) fn target_reached(
     commands: ParallelCommands,
     mut agents: Query<(Entity, &Agent, &TargetDistance, &TargetReachedCondition, Has<TargetReached>), With<Agent>>,
 ) {
     agents.par_iter_mut().for_each(|(entity, agent, distance, target_reached_condition, target_reached)| {
         commands.command_scope(|mut c| {
-            if target_reached_condition.has_reached_target(&agent, **distance) {
+            if target_reached_condition.has_reached_target(agent, **distance) {
                 if !target_reached {
                     c.entity(entity).insert(TargetReached);
                 }
@@ -132,8 +130,8 @@ pub(super) fn obstacle(
     agents.par_iter_mut().for_each(
         |(entity, target_distance, has_obstacle, state_duration, is_stationary, target_reached)| {
             commands.command_scope(|mut c| {
-                const MIN_STATIONARY_TIME: f32 = 5.0;
-                const MIN_TARGET_DISTANCE: f32 = 50.0;
+                const MIN_STATIONARY_TIME: f32 = 1.0;
+                const MIN_TARGET_DISTANCE: f32 = 30.0;
                 let should_be_obstacle = target_reached
                     || (**target_distance <= MIN_TARGET_DISTANCE
                         && is_stationary

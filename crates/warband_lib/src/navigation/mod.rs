@@ -50,7 +50,6 @@ impl Plugin for NavigationPlugin {
         app.add_plugins((AutomaticUpdate::<agent::Agent>::new(), AutomaticUpdate::<occupancy::Obstacle>::new()));
         app.add_plugins(StatPlugin::<Speed>::default());
 
-        app.insert_resource(AvoidanceOptions::default());
         #[cfg(feature = "debug")]
         app.add_plugins((ResourceInspectorPlugin::<AvoidanceOptions>::default(),));
 

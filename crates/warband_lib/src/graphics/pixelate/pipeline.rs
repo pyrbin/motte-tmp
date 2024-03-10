@@ -2,10 +2,10 @@ use bevy::{
     prelude::{FromWorld, Resource, World},
     render::{
         render_resource::{
-            BindGroupLayout, BindGroupLayoutEntry, BindingType, BufferBindingType,
-            CachedRenderPipelineId, ColorTargetState, ColorWrites, FilterMode, FragmentState, MultisampleState,
-            PipelineCache, PrimitiveState, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor,
-            ShaderStages, ShaderType, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
+            BindGroupLayout, BindGroupLayoutEntry, BindingType, BufferBindingType, CachedRenderPipelineId,
+            ColorTargetState, ColorWrites, FilterMode, FragmentState, MultisampleState, PipelineCache, PrimitiveState,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType,
+            TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
         },
         renderer::RenderDevice,
         texture::BevyDefault,

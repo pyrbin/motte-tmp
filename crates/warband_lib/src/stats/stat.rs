@@ -16,7 +16,7 @@ where
     S: Component + GetTypeRegistration,
 {
     pub clamp_value: ClampValue,
-    // TODO: implement more configuration options, like pool value clamp, etc.
+    // TODO: Implement more configuration options, like pool value clamp, etc.
     _marker: PhantomData<S>,
 }
 

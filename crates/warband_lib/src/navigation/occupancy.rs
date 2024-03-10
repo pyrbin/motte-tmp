@@ -14,7 +14,16 @@ pub struct Obstacle;
 pub enum Occupancy {
     #[default]
     Empty,
-    Occupied(SmallVec<[Vec2; 8]>),
+    Shape(SmallVec<[Vec2; 8]>),
+}
+
+impl Occupancy {
+    pub fn shape(&self) -> Option<&[Vec2]> {
+        match self {
+            Occupancy::Empty => None,
+            Occupancy::Shape(shape) => Some(shape),
+        }
+    }
 }
 
 #[derive(Component, Clone, Copy, Default, PartialEq, Reflect)]
@@ -49,7 +58,7 @@ pub(super) fn occupancy(
     >,
 ) {
     const PLANE_Y: f32 = 0.0;
-    let border_expansion = field_layout.cell_size() / 2.0;
+    let border_expansion = field_layout.cell_size();
 
     obstacles.par_iter_mut().for_each(|(mut occupancy, mut occupancy_aabb, collider, aabb, global_transform)| {
         if aabb.min.y > DEFAULT_AGENT_HEIGHT || aabb.max.y < PLANE_Y {
@@ -63,7 +72,7 @@ pub(super) fn occupancy(
         occupancy_aabb.min = aabb.min.xz() - border_expansion;
         occupancy_aabb.max = aabb.max.xz() + border_expansion;
 
-        const SUBDIVISIONS: u32 = 5;
+        const SUBDIVISIONS: u32 = 8;
         let Some((vertices, _)) = (match collider.shape_scaled().as_typed_shape() {
             TypedShape::Ball(ball) => ball.to_outline(SUBDIVISIONS).into(),
             TypedShape::Cuboid(cuboid) => cuboid.to_outline().into(),
@@ -95,19 +104,19 @@ pub(super) fn occupancy(
             .map(|point| transform.transform_point(Vec3::new(point.x, 0.0, point.y)).xz())
             .collect();
 
-        // perf: this feels like it's slow
         expand_shape(&mut shape, border_expansion);
 
-        *occupancy = Occupancy::Occupied(shape);
+        *occupancy = Occupancy::Shape(shape);
     });
 }
 
 #[inline]
 fn expand_shape(hull: &mut SmallVec<[Vec2; 8]>, expansion: f32) {
+    // perf: could probably be improved
     let center = hull.iter().fold(Vec2::ZERO, |acc, p| acc + *p) / hull.len() as f32; // Calculate center of polygon
     for point in hull.iter_mut() {
-        let direction = *point - center; // Direction vector from center to current point
-        let normalized_direction = direction.normalize(); // Normalize the direction vector
+        let direction = *point - center;
+        let normalized_direction = direction.normalize();
         let expanded_point = center + normalized_direction * (direction.length() + expansion);
         *point = expanded_point;
     }

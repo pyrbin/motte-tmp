@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::{physics::CollisionLayer, prelude::*};
 
 #[derive(Component, Debug, Clone, Default, PartialEq, Reflect)]
@@ -23,7 +21,7 @@ impl CharacterMotor {
             ground_caster: ShapeCaster::new(caster_shape, Vector::ZERO, Quaternion::default(), Direction3d::NEG_Y),
             collision_layers: CollisionLayers::new(
                 [CollisionLayer::Units],
-                [CollisionLayer::Player, CollisionLayer::Terrain, CollisionLayer::Sensor],
+                [CollisionLayer::Player, CollisionLayer::Units, CollisionLayer::Terrain, CollisionLayer::Sensor],
             ),
             character_motor: default(),
         }

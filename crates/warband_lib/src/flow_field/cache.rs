@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 pub const DEFAULT_CACHE_TTL_SEC: f32 = 30.0;
 
-#[derive(Resource, Default, Deref, DerefMut)]
+#[derive(Resource, Default, Deref, DerefMut, Reflect)]
 pub struct FlowFieldCache(HashMap<Goal, FlowFieldCacheEntry>);
 
 #[derive(Component, Reflect)]
@@ -38,7 +38,7 @@ pub(super) fn detect(
                         .spawn((
                             Name::new(format!("FlowField {:?}", goal)),
                             FlowField::default(),
-                            // TODO: doesn't currently handle field resize(s).
+                            // FIXME: doesn't currently handle field resize(s).
                             SpatialBundle {
                                 transform: field_layout.cell_to_world(*cell).into_transform(),
                                 ..default()

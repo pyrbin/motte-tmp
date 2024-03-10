@@ -4,9 +4,11 @@ use crate::{
     prelude::*,
 };
 
-// TODO:
-// Add configurations for max/min values for a Stat
-// Add configuration for modifiers to be additive or multiplicative, coefficients, etc.
+// TODO: Add configurations for max/min values for a Stat.
+
+// TODO: Add configuration for modifiers to be additive or multiplicative, coefficients, etc.
+
+// TODO: Parallelize stat systems if it has any impact on performance.
 
 pub mod modifier;
 pub mod pool;

@@ -5,7 +5,7 @@ authors = ["pyrbin <git@pyrbin>"]
 edition = "2021"
 
 [features]
-default = ["debug"] # todo: remove
+default = ["debug"]
 debug = [
     "dep:bevy-inspector-egui",
     "bevy/bevy_gizmos", 

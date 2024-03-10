@@ -46,8 +46,6 @@ impl ViewNode for PixelateNode {
 
         let gpu_images = world.resource::<RenderAssets<Image>>();
         let gpu_render_image = &gpu_images.get(image_handle).expect("Image not loaded");
-
-        // perf: cache this
         let render_image_texture = &gpu_render_image.texture_view;
 
         let bind_group = render_context.render_device().create_bind_group(

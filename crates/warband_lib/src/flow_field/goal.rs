@@ -1,9 +1,12 @@
-use super::{cache::FlowFieldCache, field::Cell, CellIndex, FieldLayout, FlowField};
+use super::{cache::FlowFieldCache, cost::OccupancyCells, field::Cell, CellIndex, FieldLayout, FlowField};
 use crate::{
-    navigation::agent::{Seek, TargetDistance},
+    navigation::{
+        agent::{Seek, TargetDistance},
+        occupancy::{self, Occupancy},
+    },
     prelude::*,
 };
-// TODO: Handle multi cell goal (Cells(SmallVec<[Cell; 8]>)) & Entity OccupancyCells.
+
 #[derive(Component, Clone, Copy, Default, PartialEq, Eq, Ord, PartialOrd, Hash, Debug, From, Reflect)]
 #[reflect(Component)]
 pub enum Goal {
@@ -23,7 +26,7 @@ pub fn seek(
     mut agents: Query<(Entity, &Goal, &mut Seek, &mut TargetDistance, &CellIndex)>,
     field_layout: Res<FieldLayout>,
     flow_field_cache: Res<FlowFieldCache>,
-    flow_fields: Query<&FlowField, Without<Deactivated<FlowField>>>,
+    flow_fields: Query<(&FlowField, Option<Ref<OccupancyCells>>), Without<Deactivated<FlowField>>>,
     transforms: Query<Ref<GlobalTransform>>,
 ) {
     agents.par_iter_mut().for_each(|(entity, goal, mut seek, mut target_distance, cell_index)| {
@@ -53,7 +56,7 @@ pub fn seek(
             timer.reset();
         }
 
-        let flow_field = flow_fields.get(entry.field).unwrap();
+        let (flow_field, occupancy) = flow_fields.get(entry.field).unwrap();
 
         let Ok(flow_field) = flow_field.read() else {
             *seek = Seek(None);
@@ -83,10 +86,21 @@ pub fn seek(
                 **target_distance = position.distance(field_layout.cell_to_world(*cell).xz());
             }
             (Goal::Entity(entity), _) => {
-                let goal_transform = transforms.get(*entity).unwrap();
-                if goal_transform.is_changed() || transform.is_changed() {
-                    let goal_position = goal_transform.translation().xz();
-                    **target_distance = position.distance(goal_position);
+                if let Some(occupancy) = occupancy {
+                    if occupancy.is_changed() || transform.is_changed() {
+                        // perf: add a "GoalRadius" component to define a static distance margin.
+                        **target_distance = occupancy
+                            .iter()
+                            .map(|&c| position.distance(field_layout.cell_to_world(c).xz()))
+                            .min_by(|a, b| a.partial_cmp(b).expect("Tried to compare a NaN"))
+                            .unwrap_or(f32::MAX);
+                    }
+                } else {
+                    let goal_transform = transforms.get(*entity).unwrap();
+                    if goal_transform.is_changed() || transform.is_changed() {
+                        let goal_position = goal_transform.translation().xz();
+                        **target_distance = position.distance(goal_position);
+                    }
                 }
             }
             _ => (),

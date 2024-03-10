@@ -9,7 +9,7 @@ use std::{
 use bevy::tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task};
 
 use super::{
-    cost::{self, Cost},
+    cost::{self, Cost, OccupancyCells},
     field::{self, Cell, Direction, Field},
     CellIndex, CostField,
 };
@@ -65,7 +65,7 @@ impl FlowField {
 
         for goal in goals.into_iter() {
             if !self.in_bounds(goal) {
-                // TODO: should we panic here?
+                // FIXME: should we panic here?
                 continue;
             }
             self.pq.push(goal, 0);
@@ -140,32 +140,34 @@ impl FlowField {
 }
 
 #[derive(Clone, Default)]
-pub(super) struct PriorityQueue {
+struct PriorityQueue {
     heap: BinaryHeap<Reverse<(u16, Cell)>>,
     contains: Field<bool>,
 }
 
 impl PriorityQueue {
-    pub fn new(size: usize) -> Self {
+    #[inline]
+    fn new(size: usize) -> Self {
         Self { heap: BinaryHeap::new(), contains: Field::new(size, vec![false; size * size]) }
     }
-
-    pub fn push(&mut self, cell: Cell, cost: u16) {
+    #[inline]
+    fn push(&mut self, cell: Cell, cost: u16) {
         self.heap.push(Reverse((cost, cell)));
         self.contains[cell] = true;
     }
 
-    pub fn pop(&mut self) -> Option<(Cell, u16)> {
+    #[inline]
+    fn pop(&mut self) -> Option<(Cell, u16)> {
         let Reverse((cost, cell)) = self.heap.pop()?;
         self.contains[cell] = false;
         Some((cell, cost))
     }
-
-    pub fn contains(&self, cell: Cell) -> bool {
+    #[inline]
+    fn contains(&self, cell: Cell) -> bool {
         self.contains[cell]
     }
-
-    pub fn clear(&mut self) {
+    #[inline]
+    fn clear(&mut self) {
         self.heap.clear();
         for cell in self.contains.iter_mut() {
             *cell = false;
@@ -203,18 +205,26 @@ pub(super) fn setup(
 pub(super) fn build(
     mut commands: Commands,
     mut flow_fields: Query<
-        (Entity, &mut super::FlowField, &CellIndex),
+        (Entity, &mut super::FlowField, &CellIndex, Option<&OccupancyCells>),
         (With<Dirty<super::FlowField>>, Without<Rebuild>, Without<Deactivated<super::FlowField>>),
     >,
     cost_field: Res<CostField>,
     time: Res<Time>,
 ) {
-    for (entity, flow_field, index) in &mut flow_fields {
+    // perf: limit update rate.
+
+    for (entity, flow_field, index, cells) in &mut flow_fields {
         let thread_pool = AsyncComputeTaskPool::get();
+
+        let goals = match cells {
+            Some(cells) => cells.iter().cloned().collect(),
+            None => vec![**index],
+        };
+
         let task: Task<_> = thread_pool.spawn(async_build(
             flow_field.clone(),
             cost_field.clone(),
-            std::iter::once(**index),
+            goals.into_iter(),
             FlowFieldBuildInfo { start: time.elapsed() },
         ));
         commands.entity(entity).remove::<Dirty<super::FlowField>>().insert(Rebuild(task));
@@ -239,7 +249,7 @@ async fn async_build(
         field.resize(cost_field.size());
     }
 
-    field.build(goals, &*cost_field);
+    field.build(goals, &cost_field);
 
     Ok(build_info)
 }
@@ -255,10 +265,10 @@ pub(super) fn poll_rebuild_tasks(
             match result {
                 Ok(result) => {
                     let elapsed_time = time.elapsed() - result.start;
-                    // info!("flowfield build, took {:?}ms", elapsed_time.as_millis());
+                    info!(target: "flow_field", "{:?}ms", elapsed_time.as_millis());
                 }
                 Err(err) => {
-                    // error!("flowfield build failed {:?}", err);
+                    error!(target: "flow_field", "failed {:?}", err);
                 }
             }
         }
@@ -272,6 +282,23 @@ pub(super) fn moved(
         (
             Without<Dirty<super::FlowField>>,
             Changed<CellIndex>,
+            With<super::FlowField>,
+            Without<Deactivated<super::FlowField>>,
+        ),
+    >,
+) {
+    for entity in &flow_fields {
+        commands.entity(entity).insert(Dirty::<super::FlowField>::default());
+    }
+}
+
+pub(super) fn cells_changed(
+    mut commands: Commands,
+    flow_fields: Query<
+        Entity,
+        (
+            Without<Dirty<super::FlowField>>,
+            Changed<OccupancyCells>,
             With<super::FlowField>,
             Without<Deactivated<super::FlowField>>,
         ),

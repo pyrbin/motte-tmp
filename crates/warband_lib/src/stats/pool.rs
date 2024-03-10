@@ -6,7 +6,7 @@ use std::{
 use super::stat::{DirtyStat, Stat, StatBundle};
 use crate::prelude::*;
 
-// TODO: current doesnt really work for negative values.
+// TODO: Current doesn't really work for negative values.
 
 #[derive(Bundle, Default)]
 pub struct PoolBundle<S: Stat + Component> {

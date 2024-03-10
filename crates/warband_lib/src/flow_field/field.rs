@@ -59,6 +59,11 @@ impl Cell {
     }
 
     #[inline]
+    pub fn distance_scaled(self, other: Cell, cell_size: f32) -> f32 {
+        self.distance(other) as f32 * cell_size
+    }
+
+    #[inline]
     pub fn adjacent(self) -> impl Iterator<Item = Cell> {
         const NEIGHBORS4: [(i32, i32); 4] = [(0, -1), (-1, 0), (1, 0), (0, 1)];
         NEIGHBORS4.iter().filter_map(move |&(dx, dy)| {

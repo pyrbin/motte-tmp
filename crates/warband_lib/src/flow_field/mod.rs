@@ -27,23 +27,19 @@ pub struct FlowFieldPlugin;
 
 impl Plugin for FlowFieldPlugin {
     fn build(&self, app: &mut App) {
-        app_register_types!(Cell, CellIndex, Goal, FieldLayout, OccupancyCells);
+        app_register_types!(Cell, CellIndex, Goal, FieldLayout, OccupancyCells, FlowFieldCache);
 
-        const DEFAULT_SIZE: usize = 100;
-        const DEFAULT_CELL_SIZE: f32 = 2.0;
-
-        app.insert_resource(FieldLayout::default().with_size(DEFAULT_SIZE).with_cell_size(DEFAULT_CELL_SIZE));
         app.insert_resource(DirtyCells::default());
         app.insert_resource(CellOccupants::default());
         app.insert_resource(CellOccupantsReverse::default());
         app.insert_resource(FlowFieldCache::default());
         app.insert_resource(CostUpdateTasks::default());
-        app.insert_resource(CostField::new(DEFAULT_SIZE));
 
         #[cfg(feature = "debug")]
         {
             use bevy_inspector_egui::quick::ResourceInspectorPlugin;
             app.add_plugins(ResourceInspectorPlugin::<FieldLayout>::default());
+            app.add_plugins(ResourceInspectorPlugin::<FlowFieldCache>::default());
         }
 
         app.configure_sets(

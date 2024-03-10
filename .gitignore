@@ -16,9 +16,9 @@ Cargo.lock
 # Added by cargo
 /target
 
-# Keep these for now
 # IntelliJ IDEA
-# .idea/
+.idea/
 
 # VSCode
 # .vscode/
+*.code-workspace
