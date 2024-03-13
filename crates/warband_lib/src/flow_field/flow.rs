@@ -73,53 +73,55 @@ impl FlowField {
             self[goal] = Direction::None;
         }
 
-        let is_traversable = |cell: Cell| cost_field[cell].is_traversable() || cost_field[cell].is_occupied();
+        let not_blocked = |cell: Cell| cost_field[cell].is_traversable() || cost_field[cell].is_occupied();
 
         while let Some((cell, _)) = self.pq.pop() {
-            let mut update = |neighbor: Cell, traversable: bool| {
+            let mut update = |neighbor: Cell, not_blocked: bool| {
                 let cost = match cost_field[neighbor] {
                     Cost::Traversable => self.distance_field[cell].saturating_add(cell.distance(neighbor) as u16),
                     Cost::Occupied => {
-                        const OCCUPIED_COST: u16 = 1000;
-                        self.distance_field[cell].saturating_add(cell.distance(neighbor) as u16 + OCCUPIED_COST)
+                        const OCCUPIED_MODIFIER: f32 = 100.0;
+                        self.distance_field[cell]
+                            .saturating_add(cell.distance_scaled(neighbor, OCCUPIED_MODIFIER) as u16)
+                        // u16::MAX - 1
                     }
                     Cost::Blocked => u16::MAX,
                 };
 
-                if !traversable || cost < self.distance_field[neighbor] {
+                if !not_blocked || cost < self.distance_field[neighbor] {
                     self.distance_field[neighbor] = cost;
                     self[neighbor] = neighbor.direction(cell);
 
-                    if traversable && !self.pq.contains(neighbor) {
+                    if not_blocked && !self.pq.contains(neighbor) {
                         self.pq.push(neighbor, cost);
                     }
                 }
             };
 
-            let current_is_traversable: bool = is_traversable(cell);
-            for (neighbor, traversable) in cost_field
+            let current_is_not_blocked: bool = not_blocked(cell);
+            for (neighbor, not_blocked) in cost_field
                 .adjacent(cell)
-                .map(|n| (n, is_traversable(n)))
-                .filter(|(_, traversable)| current_is_traversable || *traversable)
+                .map(|n| (n, not_blocked(n)))
+                .filter(|(_, not_blocked)| current_is_not_blocked || *not_blocked)
             {
-                update(neighbor, traversable);
+                update(neighbor, not_blocked);
             }
 
-            for (neighbor, traversable, direction) in cost_field
+            for (neighbor, not_blocked, direction) in cost_field
                 .diagonal(cell)
-                .map(|n| (n, is_traversable(n), cell.direction(n)))
-                .filter(|(_, traversable, _)| current_is_traversable || *traversable)
+                .map(|n| (n, not_blocked(n), cell.direction(n)))
+                .filter(|(_, not_blocked, _)| current_is_not_blocked || *not_blocked)
             {
-                let check_cost = |dir: Direction| {
+                let check_traversable = |dir: Direction| {
                     let cell = cell.at_direction(dir);
-                    cost_field.in_bounds(cell) && is_traversable(cell)
+                    cost_field.in_bounds(cell) && cost_field[cell].is_traversable()
                 };
 
                 let valid = match direction {
-                    Direction::NorthEast => check_cost(Direction::North) && check_cost(Direction::East),
-                    Direction::SouthEast => check_cost(Direction::South) && check_cost(Direction::East),
-                    Direction::SouthWest => check_cost(Direction::South) && check_cost(Direction::West),
-                    Direction::NorthWest => check_cost(Direction::North) && check_cost(Direction::West),
+                    Direction::NorthEast => check_traversable(Direction::North) && check_traversable(Direction::East),
+                    Direction::SouthEast => check_traversable(Direction::South) && check_traversable(Direction::East),
+                    Direction::SouthWest => check_traversable(Direction::South) && check_traversable(Direction::West),
+                    Direction::NorthWest => check_traversable(Direction::North) && check_traversable(Direction::West),
                     _ => false,
                 };
 
@@ -127,7 +129,7 @@ impl FlowField {
                     continue;
                 }
 
-                update(neighbor, traversable);
+                update(neighbor, not_blocked);
             }
         }
     }

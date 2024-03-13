@@ -1,0 +1,6 @@
+# Agent Pathfinding
+-  Non-Physics Based Movement
+    - (https://github.com/DigitalExtinction/Game/blob/main/crates/movement/)
+    - Agent Disc Sizes; Small, Normal, Large, Huge
+    - FlowField + CostField support for sizes
+    - Agent vs Obstacles Occupancy

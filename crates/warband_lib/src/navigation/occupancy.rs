@@ -58,7 +58,7 @@ pub(super) fn occupancy(
     >,
 ) {
     const PLANE_Y: f32 = 0.0;
-    let border_expansion = field_layout.cell_size();
+    let border_expansion = field_layout.cell_size() / 2.0;
 
     obstacles.par_iter_mut().for_each(|(mut occupancy, mut occupancy_aabb, collider, aabb, global_transform)| {
         if aabb.min.y > DEFAULT_AGENT_HEIGHT || aabb.max.y < PLANE_Y {

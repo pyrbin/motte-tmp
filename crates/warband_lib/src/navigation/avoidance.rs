@@ -53,7 +53,7 @@ pub struct AvoidanceOptions {
 
 impl Default for AvoidanceOptions {
     fn default() -> Self {
-        Self { obstacle_margin: None, agent_neighborhood: Some(1.5), time_horizon: 3.0, obstacle_time_horizon: 0.5 }
+        Self { obstacle_margin: None, agent_neighborhood: Some(1.0), time_horizon: 3.0, obstacle_time_horizon: 0.5 }
     }
 }
 
@@ -99,7 +99,7 @@ pub(super) fn apply_avoidance(
             **desired_velocity,
             delta_seconds,
             &dodgy::AvoidanceOptions {
-                obstacle_margin: avoidance_options.obstacle_margin.unwrap_or(dodgy_agent.radius * 0.5).max(0.1),
+                obstacle_margin: avoidance_options.obstacle_margin.unwrap_or(dodgy_agent.radius).max(0.1),
                 time_horizon: avoidance_options.time_horizon.max(0.1),
                 obstacle_time_horizon: avoidance_options.obstacle_time_horizon.max(0.1),
             },
@@ -134,8 +134,9 @@ type DodgyAgentNeedsSync = Or<(
     Added<DodgyAgent>,
     Changed<Agent>,
     Changed<Avoidance>,
-    Changed<Avoidance>,
-    Changed<LinearVelocity>,
+    Changed<TargetReached>,
+    Changed<DesiredVelocity>,
+    Changed<Speed>,
     ChangedPhysicsPosition,
 )>;
 
@@ -150,7 +151,7 @@ pub(super) fn dodgy_agent_sync(
             dodgy_agent.0.position = global_transform.translation().xz();
             dodgy_agent.0.velocity = velocity.xy();
             dodgy_agent.0.radius = agent.radius();
-            dodgy_agent.0.max_velocity = **speed * 2.0;
+            dodgy_agent.0.max_velocity = **speed;
             dodgy_agent.0.avoidance_responsibility = if target_reached {
                 MIN_AVOIDANCE_RESPONSIBILITY
             } else {

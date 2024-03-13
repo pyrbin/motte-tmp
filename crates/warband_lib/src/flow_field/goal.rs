@@ -1,9 +1,6 @@
 use super::{cache::FlowFieldCache, cost::OccupancyCells, field::Cell, CellIndex, FieldLayout, FlowField};
 use crate::{
-    navigation::{
-        agent::{Seek, TargetDistance},
-        occupancy::{self, Occupancy},
-    },
+    navigation::agent::{Seek, TargetDistance},
     prelude::*,
 };
 

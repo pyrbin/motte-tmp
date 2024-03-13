@@ -98,11 +98,14 @@ pub(super) fn apply_velocity(mut agents: Query<(&mut DesiredVelocity, &mut Movem
 
 pub(super) fn target_reached(
     commands: ParallelCommands,
-    mut agents: Query<(Entity, &Agent, &TargetDistance, &TargetReachedCondition, Has<TargetReached>), With<Agent>>,
+    mut agents: Query<
+        (Entity, &Agent, &Seek, &TargetDistance, &TargetReachedCondition, Has<TargetReached>),
+        With<Agent>,
+    >,
 ) {
-    agents.par_iter_mut().for_each(|(entity, agent, distance, target_reached_condition, target_reached)| {
+    agents.par_iter_mut().for_each(|(entity, agent, seek, distance, target_reached_condition, target_reached)| {
         commands.command_scope(|mut c| {
-            if target_reached_condition.has_reached_target(agent, **distance) {
+            if seek.is_some() && target_reached_condition.has_reached_target(agent, **distance) {
                 if !target_reached {
                     c.entity(entity).insert(TargetReached);
                 }
@@ -130,18 +133,19 @@ pub(super) fn obstacle(
     agents.par_iter_mut().for_each(
         |(entity, target_distance, has_obstacle, state_duration, is_stationary, target_reached)| {
             commands.command_scope(|mut c| {
-                const MIN_STATIONARY_TIME: f32 = 1.0;
+                const MIN_STATIONARY_TIME: f32 = 0.33;
                 const MIN_TARGET_DISTANCE: f32 = 30.0;
-                let should_be_obstacle = target_reached
-                    || (**target_distance <= MIN_TARGET_DISTANCE
-                        && is_stationary
-                        && state_duration.is_some()
-                        && state_duration.unwrap().duration().as_secs_f32() >= MIN_STATIONARY_TIME);
-                if should_be_obstacle {
-                    if !has_obstacle {
-                        c.entity(entity).insert(Obstacle);
-                    }
-                } else if has_obstacle {
+                let should_be_obstacle = target_reached;
+                // || (**target_distance <= MIN_TARGET_DISTANCE
+                //     && is_stationary
+                //     && state_duration.is_some()
+                //     && state_duration.unwrap().duration().as_secs_f32() >= MIN_STATIONARY_TIME);
+                if should_be_obstacle && !has_obstacle {
+                    c.entity(entity).insert(Obstacle);
+                    return;
+                }
+
+                if has_obstacle && !should_be_obstacle {
                     c.entity(entity).remove::<Obstacle>();
                 }
             });

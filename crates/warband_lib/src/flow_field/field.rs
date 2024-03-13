@@ -59,8 +59,8 @@ impl Cell {
     }
 
     #[inline]
-    pub fn distance_scaled(self, other: Cell, cell_size: f32) -> f32 {
-        self.distance(other) as f32 * cell_size
+    pub fn distance_scaled(self, other: Cell, scalar: f32) -> f32 {
+        self.distance(other) as f32 * scalar
     }
 
     #[inline]

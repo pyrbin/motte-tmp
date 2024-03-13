@@ -5,8 +5,8 @@ use crate::{physics::CollisionLayer, prelude::*};
 pub struct CharacterMotor;
 
 impl CharacterMotor {
-    pub fn capsule(height: f32, radius: f32) -> CharacterMotorBundle {
-        let collider = Collider::capsule(height, radius);
+    pub fn cylinder(height: f32, radius: f32) -> CharacterMotorBundle {
+        let collider = Collider::cylinder(height, radius);
         let mut caster_shape = collider.clone();
         caster_shape.set_scale(Vector::ONE * 0.99, 10);
 
@@ -21,7 +21,12 @@ impl CharacterMotor {
             ground_caster: ShapeCaster::new(caster_shape, Vector::ZERO, Quaternion::default(), Direction3d::NEG_Y),
             collision_layers: CollisionLayers::new(
                 [CollisionLayer::Units],
-                [CollisionLayer::Player, CollisionLayer::Units, CollisionLayer::Terrain, CollisionLayer::Sensor],
+                [
+                    CollisionLayer::Player,
+                    // CollisionLayer::Units,
+                    CollisionLayer::Terrain,
+                    CollisionLayer::Sensor,
+                ],
             ),
             character_motor: default(),
         }

@@ -28,13 +28,13 @@ impl Plugin for InGamePlugin {
         app.add_systems(Update, click);
 
         const DEFAULT_SIZE: usize = 100;
-        const DEFAULT_CELL_SIZE: f32 = 1.0;
+        const DEFAULT_CELL_SIZE: f32 = 2.0;
         app.insert_resource(FieldLayout::default().with_size(DEFAULT_SIZE).with_cell_size(DEFAULT_CELL_SIZE));
         app.insert_resource(CostField::new(DEFAULT_SIZE));
         app.insert_resource(AvoidanceOptions {
             obstacle_margin: None,
-            agent_neighborhood: Some(1.5),
-            time_horizon: 1.0,
+            agent_neighborhood: Some(2.0),
+            time_horizon: 3.0,
             obstacle_time_horizon: 0.5,
         });
     }
@@ -117,8 +117,8 @@ fn setup(
         ))
         .id();
 
-    for i in 0..16 {
-        let translation = random_point_in_square(50.0);
+    for i in 0..50 {
+        let translation = random_point_in_square(80.0);
         let radius = thread_rng().gen_range(2.0..3.0);
         let height = thread_rng().gen_range(2.0..6.0);
         commands.spawn((
@@ -141,22 +141,22 @@ fn setup(
     const HALF_RADIUS: f32 = RADIUS / 2.0;
     for i in 0..50 {
         let translation = random_point_in_square(100.0);
-        let transform = Vec3::new(translation.x, 50.0, translation.y).into_transform();
+        let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
         commands.spawn((
             Name::new(format!("agent {i}")),
             PbrBundle {
-                mesh: meshes.add(Mesh::from(Capsule3d { radius: HALF_RADIUS, half_length: RADIUS })),
-                material: materials.add(Color::GREEN),
+                mesh: meshes.add(Mesh::from(Cylinder { radius: HALF_RADIUS, half_height: HALF_RADIUS })),
+                material: materials.add(Color::GREEN.with_a(0.75)),
                 transform,
                 ..default()
             },
-            CharacterMotor::capsule(RADIUS, HALF_RADIUS),
+            CharacterMotor::cylinder(RADIUS, HALF_RADIUS),
             pixelate::Snap::translation(),
             Goal::Entity(target),
             CellIndex::default(),
             Agent::default().with_radius(RADIUS),
-            TargetReachedCondition::Distance(1.),
-            Avoidance::default().with_neighborhood(2.0),
+            TargetReachedCondition::Distance(RADIUS),
+            Avoidance::default(),
             DesiredVelocity::default(),
             Speed::base(500.0),
         ));
