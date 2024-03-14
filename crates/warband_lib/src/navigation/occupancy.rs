@@ -3,7 +3,7 @@ use bevy_xpbd_3d::parry::{
     shape::TypedShape,
 };
 
-use crate::{flow_field::FieldLayout, navigation::agent::DEFAULT_AGENT_HEIGHT, prelude::*};
+use crate::{navigation::agent::DEFAULT_AGENT_HEIGHT, prelude::*};
 
 #[derive(Component, Clone, Reflect)]
 #[reflect(Component)]
@@ -51,14 +51,13 @@ pub(super) fn setup(mut commands: Commands, obstacles: Query<Entity, (With<Obsta
 }
 
 pub(super) fn occupancy(
-    field_layout: Res<FieldLayout>,
     mut obstacles: Query<
         (&mut Occupancy, &mut OccupancyAabb, &Collider, &ColliderAabb, &GlobalTransform),
         Or<(ChangedPhysicsPosition, Changed<Collider>, Changed<ColliderAabb>)>,
     >,
 ) {
     const PLANE_Y: f32 = 0.0;
-    let border_expansion = field_layout.cell_size() / 2.0;
+    let border_expansion = 1.0;
 
     obstacles.par_iter_mut().for_each(|(mut occupancy, mut occupancy_aabb, collider, aabb, global_transform)| {
         if aabb.min.y > DEFAULT_AGENT_HEIGHT || aabb.max.y < PLANE_Y {

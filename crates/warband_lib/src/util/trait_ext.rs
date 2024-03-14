@@ -175,6 +175,8 @@ pub(crate) trait Vec3Ext: Copy {
     fn is_approx_zero(self) -> bool;
     fn split(self, up: Vec3) -> SplitVec3;
     fn x0z(self) -> Vec3;
+    // Pads the y coordinate by 0.1 to prevent clipping (mostly for debug rendering).
+    fn y_pad(self) -> Vec3;
 }
 
 impl Vec3Ext for Vec3 {
@@ -193,6 +195,11 @@ impl Vec3Ext for Vec3 {
     #[inline]
     fn x0z(self) -> Vec3 {
         Vec3::new(self.x, 0., self.z)
+    }
+
+    #[inline]
+    fn y_pad(self) -> Vec3 {
+        self + Vec3::Y * 0.1
     }
 }
 

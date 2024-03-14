@@ -7,7 +7,10 @@ use self::cursor::{CursorClick, CursorPosition};
 use crate::{
     app_state::AppState,
     asset_management::ImageAssets,
-    flow_field::{goal::Goal, CellIndex, CostField, FieldLayout, FlowField},
+    flow_field::{
+        fields::{density::DensityField, CostFields},
+        layout::FieldLayout,
+    },
     graphics::pixelate,
     movement::motor::CharacterMotor,
     navigation::{
@@ -15,7 +18,6 @@ use crate::{
         avoidance::{Avoidance, AvoidanceOptions},
         occupancy::Obstacle,
     },
-    player::camera::MainCamera,
     prelude::*,
     util::math::random_point_in_square,
 };
@@ -25,12 +27,17 @@ pub struct InGamePlugin;
 impl Plugin for InGamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(AppState::InGame), setup);
-        app.add_systems(Update, click);
+        // app.add_systems(Update, click);
 
-        const DEFAULT_SIZE: usize = 100;
-        const DEFAULT_CELL_SIZE: f32 = 2.0;
-        app.insert_resource(FieldLayout::default().with_size(DEFAULT_SIZE).with_cell_size(DEFAULT_CELL_SIZE));
-        app.insert_resource(CostField::new(DEFAULT_SIZE));
+        const DEFAULT_SIZE: (usize, usize) = (50, 50);
+        const DEFAULT_CELL_SIZE: f32 = 1.0;
+
+        let layout = FieldLayout::new(DEFAULT_SIZE.0, DEFAULT_SIZE.1).with_cell_size(DEFAULT_CELL_SIZE);
+        let cost_fields = CostFields { density: DensityField::from_layout(&layout) };
+
+        app.insert_resource(layout);
+        app.insert_resource(cost_fields);
+
         app.insert_resource(AvoidanceOptions {
             obstacle_margin: None,
             agent_neighborhood: Some(2.0),
@@ -99,25 +106,23 @@ fn setup(
         RigidBody::Static,
     ));
 
-    let target = commands
-        .spawn((
-            Name::new("target"),
-            PbrBundle {
-                mesh: meshes.add(Sphere::new(5.0).mesh().ico(5).unwrap()),
-                material: materials.add(Color::BLUE.with_a(0.33)),
-                transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
-                ..default()
-            },
-            Collider::from(Sphere::new(5.0)),
-            RigidBody::Static,
-            Obstacle,
-            Position::default(),
-            CellIndex::default(),
-            FlowField::default(),
-        ))
-        .id();
+    // let target = commands
+    //     .spawn((
+    //         Name::new("target"),
+    //         PbrBundle {
+    //             mesh: meshes.add(Sphere::new(5.0).mesh().ico(5).unwrap()),
+    //             material: materials.add(Color::BLUE.with_a(0.33)),
+    //             transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
+    //             ..default()
+    //         },
+    //         Collider::from(Sphere::new(5.0)),
+    //         RigidBody::Static,
+    //         Obstacle,
+    //         Position::default(),
+    //     ))
+    //     .id();
 
-    for i in 0..50 {
+    for i in 0..0 {
         let translation = random_point_in_square(80.0);
         let radius = thread_rng().gen_range(2.0..3.0);
         let height = thread_rng().gen_range(2.0..6.0);
@@ -131,7 +136,6 @@ fn setup(
             },
             Collider::from(Capsule3d::new(radius, height)),
             pixelate::Snap::translation(),
-            CellIndex::default(),
             RigidBody::Static,
             Obstacle,
             LinearVelocity::ZERO,
@@ -140,7 +144,7 @@ fn setup(
     const RADIUS: f32 = 1.0;
     const HALF_RADIUS: f32 = RADIUS / 2.0;
     for i in 0..50 {
-        let translation = random_point_in_square(100.0);
+        let translation = random_point_in_square(40.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
         commands.spawn((
             Name::new(format!("agent {i}")),
@@ -152,8 +156,8 @@ fn setup(
             },
             CharacterMotor::cylinder(RADIUS, HALF_RADIUS),
             pixelate::Snap::translation(),
-            Goal::Entity(target),
-            CellIndex::default(),
+            // Goal::Entity(target),
+            // CellIndex::default(),
             Agent::default().with_radius(RADIUS),
             TargetReachedCondition::Distance(RADIUS),
             Avoidance::default(),
@@ -163,23 +167,23 @@ fn setup(
     }
 }
 
-fn click(
-    cursor: Res<CursorPosition>,
-    mut event_reader: EventReader<CursorClick>,
-    mut fields: Query<(&mut Transform, &mut CellIndex, &FlowField)>,
-    main_cam: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
-    field_layout: Res<FieldLayout>,
-) {
-    for cursor_click in event_reader.read() {
-        if !matches!(cursor_click.button, MouseButton::Right) {
-            continue;
-        }
-        for (mut transform, mut cell_index, _) in &mut fields {
-            let (camera, camera_transform) = main_cam.get_single().expect("there should be a main camera");
-            let (origin, direction) = math::world_space_ray_from_ndc(cursor.ndc(), camera, camera_transform);
-            let position = math::plane_intersection(origin, direction, Vec3::ZERO, Vec3::Y);
-            transform.translation = position;
-            **cell_index = field_layout.world_to_cell(position);
-        }
-    }
-}
+// fn click(
+//     cursor: Res<CursorPosition>,
+//     mut event_reader: EventReader<CursorClick>,
+//     mut fields: Query<(&mut Transform, &mut CellIndex, &FlowField)>,
+//     main_cam: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
+//     field_layout: Res<FieldLayout>,
+// ) {
+//     for cursor_click in event_reader.read() {
+//         if !matches!(cursor_click.button, MouseButton::Right) {
+//             continue;
+//         }
+//         for (mut transform, mut cell_index, _) in &mut fields {
+//             let (camera, camera_transform) = main_cam.get_single().expect("there should be a main camera");
+//             let (origin, direction) = math::world_space_ray_from_ndc(cursor.ndc(), camera, camera_transform);
+//             let position = math::plane_intersection(origin, direction, Vec3::ZERO, Vec3::Y);
+//             transform.translation = position;
+//             **cell_index = field_layout.world_to_cell(position);
+//         }
+//     }
+// }

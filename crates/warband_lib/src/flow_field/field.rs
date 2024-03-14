@@ -53,14 +53,13 @@ impl Cell {
         self.0 .1
     }
 
-    #[inline]
-    pub fn distance(self, other: Cell) -> usize {
-        manhattan_dist(self, other)
+    pub fn index(&self, size: usize) -> usize {
+        cell_to_index((self.x(), self.y()), size)
     }
 
     #[inline]
-    pub fn distance_scaled(self, other: Cell, scalar: f32) -> f32 {
-        self.distance(other) as f32 * scalar
+    pub fn manhattan(self, rhs: Cell) -> usize {
+        (self.x() as isize - rhs.x() as isize).unsigned_abs() + (self.y() as isize - rhs.y() as isize).unsigned_abs()
     }
 
     #[inline]
@@ -89,6 +88,14 @@ impl Cell {
     }
 
     #[inline]
+    pub fn sample_neighbors<'a>(self, directions: &'a [Direction]) -> impl Iterator<Item = (Cell, Direction)> + 'a {
+        directions
+            .iter()
+            .copied()
+            .filter_map(move |direction| self.neighbor(direction).map(|neighbor| (neighbor, direction)))
+    }
+
+    #[inline]
     pub fn direction(&self, other: Cell) -> Direction {
         let dx = other.x() as isize - self.x() as isize;
         let dy = other.y() as isize - self.y() as isize;
@@ -106,29 +113,40 @@ impl Cell {
     }
 
     #[inline]
-    pub fn at_direction(self, direction: Direction) -> Cell {
-        match direction {
-            Direction::North => Cell::new(self.x(), self.y() - 1),
-            Direction::NorthEast => Cell::new(self.x() + 1, self.y() - 1),
-            Direction::East => Cell::new(self.x() + 1, self.y()),
-            Direction::SouthEast => Cell::new(self.x() + 1, self.y() + 1),
-            Direction::South => Cell::new(self.x(), self.y() + 1),
-            Direction::SouthWest => Cell::new(self.x() - 1, self.y() + 1),
-            Direction::West => Cell::new(self.x() - 1, self.y()),
-            Direction::NorthWest => Cell::new(self.x() - 1, self.y() - 1),
-            Direction::None => self,
-        }
+    pub fn neighbor(self, direction: Direction) -> Option<Cell> {
+        let (dx, dy) = match direction {
+            Direction::North => (0, -1),
+            Direction::NorthEast => (1, -1),
+            Direction::East => (1, 0),
+            Direction::SouthEast => (1, 1),
+            Direction::South => (0, 1),
+            Direction::SouthWest => (-1, 1),
+            Direction::West => (-1, 0),
+            Direction::NorthWest => (-1, -1),
+            Direction::None => return None,
+        };
+
+        let x = self.x().checked_add_signed(dx as isize);
+        let y = self.y().checked_add_signed(dy as isize);
+        x.and_then(|x| y.map(|y| Cell::new(x, y)))
     }
 
-    #[allow(unused)]
+    #[inline]
     pub fn as_vec2(self) -> Vec2 {
         Vec2::new(self.x() as f32, self.y() as f32)
     }
 }
 
+/// Returns the 1-dimensional index of a [Cell].
 #[inline]
-pub fn manhattan_dist(a: Cell, b: Cell) -> usize {
-    (a.x() as isize - b.x() as isize).unsigned_abs() + (a.y() as isize - b.y() as isize).unsigned_abs()
+pub fn cell_to_index(cell: (usize, usize), width: usize) -> usize {
+    cell.1 * width + cell.0
+}
+
+/// Returns the 2-dimensional [Cell] of a 1-dimensional index.
+#[inline]
+pub fn index_to_cell(index: usize, width: usize) -> Cell {
+    Cell::new(index % width, index / width)
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Reflect)]
@@ -164,25 +182,26 @@ impl Direction {
 
 #[derive(Default, Clone, Reflect)]
 pub struct Field<T> {
-    size: usize,
+    width: usize,
+    height: usize,
     data: Vec<T>,
 }
 
 impl<T> Field<T> {
-    pub fn new(size: usize, data: Vec<T>) -> Self {
-        Self { data, size }
+    pub fn new(width: usize, height: usize, data: Vec<T>) -> Self {
+        Self { data, width, height }
     }
 
     /// Returns the 1-dimensional index of a [Cell].
     #[inline]
     pub fn index(&self, cell: Cell) -> usize {
-        cell_to_index(*cell, self.size())
+        cell_to_index(*cell, self.width)
     }
 
     /// Returns the 2-dimensional [Cell] of a 1-dimensional index.
     #[inline]
     pub fn cell(&self, index: usize) -> Cell {
-        index_to_cell(index, self.size())
+        index_to_cell(index, self.width)
     }
 
     #[inline]
@@ -190,7 +209,7 @@ impl<T> Field<T> {
     where
         T: Default + Copy,
     {
-        if self.in_bounds(cell) {
+        if self.valid(cell) {
             let data = self[cell];
             Some(data)
         } else {
@@ -199,40 +218,54 @@ impl<T> Field<T> {
     }
 
     #[inline]
-    pub fn in_bounds(&self, cell: Cell) -> bool {
-        cell.x() < self.size() && cell.y() < self.size()
+    pub fn valid(&self, cell: Cell) -> bool {
+        cell.x() < self.width && cell.y() < self.height
     }
 
     #[inline]
     pub fn adjacent(&self, cell: Cell) -> impl Iterator<Item = Cell> + '_ {
-        cell.adjacent().filter(move |&cell| self.in_bounds(cell))
+        cell.adjacent().filter(move |&cell| self.valid(cell))
     }
 
     #[inline]
     pub fn diagonal(&self, cell: Cell) -> impl Iterator<Item = Cell> + '_ {
-        cell.diagonal().filter(move |&cell| self.in_bounds(cell))
-    }
-
-    #[allow(unused)]
-    pub fn neighbors(&self, cell: Cell) -> impl Iterator<Item = Cell> + '_ {
-        cell.neighbors().filter(move |&cell| self.in_bounds(cell))
+        cell.diagonal().filter(move |&cell| self.valid(cell))
     }
 
     #[inline]
-    pub fn resize(&mut self, size: usize)
+    #[allow(unused)]
+    pub fn neighbors(&self, cell: Cell) -> impl Iterator<Item = Cell> + '_ {
+        cell.neighbors().filter(move |&cell| self.valid(cell))
+    }
+
+    #[inline]
+    pub fn resize(&mut self, width: usize, height: usize)
     where
         T: Default + Clone,
     {
-        self.size = size;
-        self.data.resize(size * size, T::default());
+        self.width = width;
+        self.height = height;
+        self.data.resize(self.len(), T::default());
     }
 
-    pub fn size(&self) -> usize {
-        self.size
+    #[inline]
+    pub fn width(&self) -> usize {
+        self.width
     }
 
+    #[inline]
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.width * self.height
+    }
+
+    #[inline]
     pub fn empty(&self) -> bool {
-        self.size() == 0
+        self.len() == 0
     }
 }
 
@@ -267,14 +300,17 @@ impl<T> IndexMut<Cell> for Field<T> {
     }
 }
 
-/// Returns the 1-dimensional index of a [Cell].
-#[inline]
-pub fn cell_to_index(cell: (usize, usize), size: usize) -> usize {
-    cell.1 * size + cell.0
+impl<T> Index<usize> for Field<T> {
+    type Output = T;
+    #[inline]
+    fn index(&self, index: usize) -> &T {
+        &self.data[index]
+    }
 }
 
-/// Returns the 2-dimensional [Cell] of a 1-dimensional index.
-#[inline]
-pub fn index_to_cell(index: usize, size: usize) -> Cell {
-    Cell::new(index % size, index / size)
+impl<T> IndexMut<usize> for Field<T> {
+    #[inline]
+    fn index_mut(&mut self, index: usize) -> &mut T {
+        &mut self.data[index]
+    }
 }

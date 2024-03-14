@@ -1,3 +1,5 @@
+use std::marker::ConstParamTy;
+
 use super::occupancy::Obstacle;
 use crate::{
     movement::motor::{Movement, Stationary},
@@ -21,12 +23,105 @@ impl Default for Agent {
 }
 
 impl Agent {
+    pub fn cylinder(radius: AgentRadius, height: f32) -> AgentBundle {
+        AgentBundle { agent: default(), shape: AgentShape::cylinder(radius, height) }
+    }
+
+    pub fn medium() -> AgentBundle {
+        AgentBundle { agent: default(), shape: AgentShape::cylinder(AgentRadius::Medium, AgentRadius::Medium.into()) }
+    }
+
+    pub fn large() -> AgentBundle {
+        AgentBundle { agent: default(), shape: AgentShape::cylinder(AgentRadius::Large, AgentRadius::Large.into()) }
+    }
+
+    pub fn huge() -> AgentBundle {
+        AgentBundle { agent: default(), shape: AgentShape::cylinder(AgentRadius::Huge, AgentRadius::Huge.into()) }
+    }
+
     pub fn radius(&self) -> f32 {
         self.radius
     }
     pub fn with_radius(mut self, radius: f32) -> Self {
         self.radius = radius;
         self
+    }
+}
+
+#[derive(Bundle)]
+pub struct AgentBundle {
+    agent: Agent,
+    shape: AgentShape,
+}
+
+impl AgentBundle {
+    pub fn shape(&mut self) -> &mut AgentShape {
+        &mut self.shape
+    }
+}
+
+// TODO: Maybe just rename to Agent
+#[derive(Component, Debug, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct AgentShape {
+    radius: AgentRadius,
+    height: f32,
+}
+
+impl AgentShape {
+    pub fn cylinder(radius: AgentRadius, height: f32) -> Self {
+        Self { radius, height }
+    }
+
+    pub fn with_radius(mut self, radius: AgentRadius) -> Self {
+        self.radius = radius;
+        self
+    }
+
+    pub fn with_height(mut self, height: f32) -> Self {
+        self.height = height;
+        self
+    }
+
+    pub fn radius(&self) -> AgentRadius {
+        self.radius
+    }
+
+    pub fn height(&self) -> f32 {
+        self.height
+    }
+}
+
+#[derive(Component, Default, ConstParamTy, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Reflect)]
+#[repr(u8)]
+pub enum AgentRadius {
+    #[default]
+    Small = 1,
+    Medium = 2,
+    Large = 3,
+    Huge = 4,
+}
+
+impl From<AgentRadius> for u8 {
+    fn from(r: AgentRadius) -> u8 {
+        r as u8
+    }
+}
+
+impl From<AgentRadius> for f32 {
+    fn from(r: AgentRadius) -> f32 {
+        r as u8 as f32
+    }
+}
+
+impl std::fmt::Display for AgentRadius {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Small => write!(f, "Small"),
+            Self::Medium => write!(f, "Medium"),
+            Self::Large => write!(f, "Large"),
+            Self::Huge => write!(f, "Huge"),
+        }
     }
 }
 

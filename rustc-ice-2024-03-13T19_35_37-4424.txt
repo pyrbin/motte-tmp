@@ -1,0 +1,87 @@
+thread 'rustc' panicked at /rustc/7ffc697ce10f19447c0ce338428ae4b9bc0c041c\compiler\rustc_query_system\src\query\plumbing.rs:727:9:
+Found unstable fingerprints for mir_borrowck(warband_lib[f19e]::flow_field::flow::async_build): BorrowCheckResult { concrete_opaque_types: {DefId(0:7516 ~ warband_lib[f19e]::flow_field::flow::async_build::{opaque#0}): OpaqueHiddenType { span: crates\warband_lib\src\flow_field\flow.rs:241:54: 257:2 (#0), ty: {type error} }}, closure_requirements: None, used_mut_upvars: [], tainted_by_errors: None }
+stack backtrace:
+   0:     0x7ffe69cac884 - std::backtrace::Backtrace::force_capture::h325792b3879c4917
+   1:     0x7ffe69cac7e4 - std::backtrace::Backtrace::force_capture::h325792b3879c4917
+   2:     0x7ffe6e576e22 - <tracing_subscriber[453f5d45349755c3]::fmt::format::Writer>::write_fmt
+   3:     0x7ffe69cc5d13 - std::panicking::rust_panic_with_hook::h0edbbdcf59fc1874
+   4:     0x7ffe69cc5bb9 - <std::panicking::begin_panic_handler::StaticStrPayload as core::panic::PanicPayload>::take_box::h4518f68a13db1d0e
+   5:     0x7ffe69cc2da9 - <std::sys_common::backtrace::_print::DisplayBacktrace as core::fmt::Display>::fmt::h1e6c0c3eb1eaed39
+   6:     0x7ffe69cc5886 - rust_begin_unwind
+   7:     0x7ffe69d1a797 - core::panicking::panic_fmt::h5e8ef6a86d83b751
+   8:     0x7ffe6f1ecda3 - <rustc_query_impl[3e6ecb554564b17e]::plumbing::QueryCtxt as rustc_query_system[d6b8e3eea37df80f]::query::QueryContext>::depth_limit_error
+   9:     0x7ffe6df1e4e3 - <rustc_query_impl[3e6ecb554564b17e]::plumbing::QueryCtxt as rustc_query_system[d6b8e3eea37df80f]::query::QueryContext>::load_side_effects
+  10:     0x7ffe6de7652f - <rustc_query_impl[3e6ecb554564b17e]::plumbing::QueryCtxt as rustc_query_system[d6b8e3eea37df80f]::query::QueryContext>::load_side_effects
+  11:     0x7ffe6cdd3f88 - <rustc_hir_analysis[2655d19295ed6250]::bounds::Bounds>::push_projection_bound
+  12:     0x7ffe6cdd7323 - rustc_hir_analysis[2655d19295ed6250]::check::compare_impl_item::compare_impl_const_raw
+  13:     0x7ffe6d086ad5 - rustc_query_impl[3e6ecb554564b17e]::profiling_support::alloc_self_profile_query_strings
+  14:     0x7ffe6d0ca2f3 - rustc_query_impl[3e6ecb554564b17e]::profiling_support::alloc_self_profile_query_strings
+  15:     0x7ffe6dec0c67 - <rustc_query_impl[3e6ecb554564b17e]::plumbing::QueryCtxt as rustc_query_system[d6b8e3eea37df80f]::query::QueryContext>::load_side_effects
+  16:     0x7ffe6d090f45 - rustc_query_impl[3e6ecb554564b17e]::profiling_support::alloc_self_profile_query_strings
+  17:     0x7ffe6dfc29ee - <rustc_middle[e4837953262cce38]::traits::specialization_graph::Children as rustc_trait_selection[d7e3eb43133710d]::traits::specialize::specialization_graph::ChildrenExt>::insert
+  18:     0x7ffe6dfdaee9 - <rustc_trait_selection[d7e3eb43133710d]::traits::select::SelectionContext>::evaluate_root_obligation
+  19:     0x7ffe6e005bb7 - <rustc_trait_selection[d7e3eb43133710d]::traits::select::SelectionContext>::poly_select
+  20:     0x7ffe6e0013f1 - <rustc_trait_selection[d7e3eb43133710d]::traits::select::SelectionContext>::poly_select
+  21:     0x7ffe6dfc54c7 - <rustc_trait_selection[d7e3eb43133710d]::traits::select::SelectionContext>::evaluate_root_obligation
+  22:     0x7ffe6ddc44e6 - rustc_traits[dbaed4a86c191897]::evaluate_obligation::evaluate_obligation
+  23:     0x7ffe6de26006 - <rustc_query_impl[3e6ecb554564b17e]::plumbing::QueryCtxt as rustc_query_system[d6b8e3eea37df80f]::query::QueryContext>::load_side_effects
+  24:     0x7ffe6ded392c - <rustc_query_impl[3e6ecb554564b17e]::plumbing::QueryCtxt as rustc_query_system[d6b8e3eea37df80f]::query::QueryContext>::load_side_effects
+  25:     0x7ffe6ddf8b03 - <rustc_mir_dataflow[41a68f5ccfe23022]::rustc_peek::SanityCheck as rustc_middle[e4837953262cce38]::mir::MirPass>::run_pass
+  26:     0x7ffe6e01be15 - <rustc_trait_selection[d7e3eb43133710d]::traits::fulfill::FulfillProcessor as rustc_data_structures[275e37b6a1d3f9a3]::obligation_forest::ObligationProcessor>::process_obligation
+  27:     0x7ffe6e01121c - <rustc_trait_selection[d7e3eb43133710d]::traits::error_reporting::on_unimplemented::OnUnimplementedDirective>::of_item
+  28:     0x7ffe6e019cc7 - <rustc_trait_selection[d7e3eb43133710d]::traits::fulfill::FulfillmentContext as rustc_infer[fc909479c4ae7dbf]::traits::engine::TraitEngine>::select_where_possible
+  29:     0x7ffe6d648387 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::probe_instantiate_query_response
+  30:     0x7ffe6d6166b5 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::demand_eqtype
+  31:     0x7ffe6d64c336 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::check_struct_path
+  32:     0x7ffe6d64e3c6 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::check_struct_path
+  33:     0x7ffe6d6157b3 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::demand_eqtype
+  34:     0x7ffe6d668e54 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::check_match
+  35:     0x7ffe6d6165dd - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::demand_eqtype
+  36:     0x7ffe6d64e41b - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::check_struct_path
+  37:     0x7ffe6d618f25 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::demand_eqtype
+  38:     0x7ffe6d668e54 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::check_match
+  39:     0x7ffe6d6165dd - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::demand_eqtype
+  40:     0x7ffe6d616e1f - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::demand_eqtype
+  41:     0x7ffe6d64e530 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::check_struct_path
+  42:     0x7ffe6d6157b3 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::demand_eqtype
+  43:     0x7ffe6d6311f8 - <rustc_hir_typeck[1896bb3ba4206571]::fn_ctxt::FnCtxt>::demand_eqtype
+  44:     0x7ffe6d5f4342 - rustc_hir_typeck[1896bb3ba4206571]::typeck
+  45:     0x7ffe6d5ef087 - rustc_hir_typeck[1896bb3ba4206571]::typeck
+  46:     0x7ffe6de269bf - <rustc_query_impl[3e6ecb554564b17e]::plumbing::QueryCtxt as rustc_query_system[d6b8e3eea37df80f]::query::QueryContext>::load_side_effects
+  47:     0x7ffe6de4018f - <rustc_query_impl[3e6ecb554564b17e]::plumbing::QueryCtxt as rustc_query_system[d6b8e3eea37df80f]::query::QueryContext>::load_side_effects
+  48:     0x7ffe6df1e62a - <rustc_query_impl[3e6ecb554564b17e]::plumbing::QueryCtxt as rustc_query_system[d6b8e3eea37df80f]::query::QueryContext>::load_side_effects
+  49:     0x7ffe6de761d1 - <rustc_query_impl[3e6ecb554564b17e]::plumbing::QueryCtxt as rustc_query_system[d6b8e3eea37df80f]::query::QueryContext>::load_side_effects
+  50:     0x7ffe6e9a8dbc - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  51:     0x7ffe6e9a7a53 - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  52:     0x7ffe6e93c132 - <rustc_privacy[437a9aed802096]::errors::PrivateInterfacesOrBoundsLint as rustc_errors[67c20c82a46b2c9e]::diagnostic::DecorateLint<()>>::decorate_lint
+  53:     0x7ffe6e9eb91f - <rustc_hir_analysis[2655d19295ed6250]::structured_errors::sized_unsized_cast::SizedUnsizedCast as rustc_hir_analysis[2655d19295ed6250]::structured_errors::StructuredDiagnostic>::diagnostic_extended
+  54:     0x7ffe6e9a94f5 - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  55:     0x7ffe6e9febbf - <rustc_hir_analysis[2655d19295ed6250]::structured_errors::sized_unsized_cast::SizedUnsizedCast as rustc_hir_analysis[2655d19295ed6250]::structured_errors::StructuredDiagnostic>::diagnostic_extended
+  56:     0x7ffe6e9a93a6 - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  57:     0x7ffe6e9febbf - <rustc_hir_analysis[2655d19295ed6250]::structured_errors::sized_unsized_cast::SizedUnsizedCast as rustc_hir_analysis[2655d19295ed6250]::structured_errors::StructuredDiagnostic>::diagnostic_extended
+  58:     0x7ffe6e9a93a6 - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  59:     0x7ffe6e9febbf - <rustc_hir_analysis[2655d19295ed6250]::structured_errors::sized_unsized_cast::SizedUnsizedCast as rustc_hir_analysis[2655d19295ed6250]::structured_errors::StructuredDiagnostic>::diagnostic_extended
+  60:     0x7ffe6e9a93a6 - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  61:     0x7ffe6e9febbf - <rustc_hir_analysis[2655d19295ed6250]::structured_errors::sized_unsized_cast::SizedUnsizedCast as rustc_hir_analysis[2655d19295ed6250]::structured_errors::StructuredDiagnostic>::diagnostic_extended
+  62:     0x7ffe6e9a94f5 - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  63:     0x7ffe6e9febbf - <rustc_hir_analysis[2655d19295ed6250]::structured_errors::sized_unsized_cast::SizedUnsizedCast as rustc_hir_analysis[2655d19295ed6250]::structured_errors::StructuredDiagnostic>::diagnostic_extended
+  64:     0x7ffe6e9a93a6 - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  65:     0x7ffe6e9febbf - <rustc_hir_analysis[2655d19295ed6250]::structured_errors::sized_unsized_cast::SizedUnsizedCast as rustc_hir_analysis[2655d19295ed6250]::structured_errors::StructuredDiagnostic>::diagnostic_extended
+  66:     0x7ffe6e9ae444 - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  67:     0x7ffe6fcbccd6 - <rayon_core[aa67d841932da422]::registry::WorkerThread>::wait_until_cold
+  68:     0x7ffe6e9a9434 - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  69:     0x7ffe6e9febbf - <rustc_hir_analysis[2655d19295ed6250]::structured_errors::sized_unsized_cast::SizedUnsizedCast as rustc_hir_analysis[2655d19295ed6250]::structured_errors::StructuredDiagnostic>::diagnostic_extended
+  70:     0x7ffe6e9ae444 - <<rustc_hir_analysis[2655d19295ed6250]::coherence::inherent_impls_overlap::InherentOverlapChecker>::check_item::RegionId as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  71:     0x7ffe6fcbccd6 - <rayon_core[aa67d841932da422]::registry::WorkerThread>::wait_until_cold
+  72:     0x7ffe6fcbb196 - <rayon_core[aa67d841932da422]::registry::ThreadBuilder>::run
+  73:     0x7ffe6e597116 - <tracing_subscriber[453f5d45349755c3]::fmt::format::Writer>::write_fmt
+  74:     0x7ffe6e576afd - <rustc_data_structures[275e37b6a1d3f9a3]::hashes::Hash64 as core[2f77d60b5dd6898b]::fmt::Debug>::fmt
+  75:     0x7ffe6e58b8e9 - <tracing_subscriber[453f5d45349755c3]::fmt::format::Writer>::write_fmt
+  76:     0x7ffe6e590137 - <tracing_subscriber[453f5d45349755c3]::fmt::format::Writer>::write_fmt
+  77:     0x7ffe69cd754c - std::sys::pal::windows::thread::Thread::new::hf36885d72776899b
+  78:     0x7fff41ab257d - BaseThreadInitThunk
+  79:     0x7fff41dcaa58 - RtlUserThreadStart
+
+
+rustc version: 1.77.0-nightly (7ffc697ce 2024-01-24)
+platform: x86_64-pc-windows-msvc

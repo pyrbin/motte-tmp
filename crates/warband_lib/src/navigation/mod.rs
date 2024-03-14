@@ -9,7 +9,6 @@ use self::{
 };
 use crate::{
     app_state::AppState,
-    flow_field::FlowFieldSystems,
     movement::MovementSystems,
     navigation::{
         agent::{Agent, TargetReachedCondition},
@@ -60,8 +59,8 @@ impl Plugin for NavigationPlugin {
         app.configure_sets(
             PostUpdate,
             (
-                NavigationSystems::Maintain.before(FlowFieldSystems::Maintain),
-                NavigationSystems::ApplyVelocity.after(FlowFieldSystems::Poll).before(MovementSystems::Motor),
+                NavigationSystems::Maintain,//.before(FlowFieldSystems::Maintain),
+                NavigationSystems::ApplyVelocity.before(MovementSystems::Motor) //.after(FlowFieldSystems::Poll).before(MovementSystems::Motor),
             )
                 .chain()
                 .before(PhysicsSet::Prepare)

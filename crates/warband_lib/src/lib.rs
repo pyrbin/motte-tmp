@@ -2,6 +2,8 @@
 #![feature(if_let_guard)]
 #![feature(const_format_args)]
 #![feature(hash_extract_if)]
+#![feature(adt_const_params)]
+#![allow(incomplete_features)]
 
 mod app_state;
 mod asset_management;
