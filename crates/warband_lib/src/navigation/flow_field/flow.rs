@@ -1,7 +1,7 @@
 use std::{
     cmp::Reverse,
     collections::BinaryHeap,
-    simd::{f32x2, f32x4, num::SimdFloat},
+    simd::{f32x4, num::SimdFloat},
 };
 
 use ordered_float::NotNan;
@@ -25,12 +25,15 @@ macro_rules! notnan {
 #[derive(Component, Reflect)]
 pub struct FlowField<const R: AgentRadius> {
     potential: Field<f32>,
+    // implement reflection for f32x4
     #[reflect(ignore)]
     speed: Field<f32x4>,
     #[reflect(ignore)]
     cost: Field<f32x4>,
     #[reflect(ignore)]
     heap: Heap,
+    #[reflect(ignore)]
+    known: Field<bool>,
 }
 
 const SAMPLE_KERNEL: [Direction; 4] = [Direction::East, Direction::West, Direction::North, Direction::South];
@@ -43,6 +46,7 @@ impl<const R: AgentRadius> FlowField<R> {
             speed: Field::new(layout.width(), layout.height(), vec![f32x4::splat(0.0); size]),
             cost: Field::new(layout.width(), layout.height(), vec![f32x4::splat(0.0); size]),
             heap: Heap::new(layout.width(), layout.height()),
+            known: Field::new(layout.width(), layout.height(), vec![false; size]),
         }
     }
 
@@ -166,7 +170,7 @@ impl<const R: AgentRadius> FlowField<R> {
             density = (density - f32x4::splat(MIN_DENSITY)).clamp01()
                 / (f32x4::splat(MAX_DENSITY) - f32x4::splat(MIN_DENSITY));
 
-            let speed: std::simd::prelude::Simd<f32, 4> = f32x4::splat(1.0) + density * flow;
+            let speed: std::simd::prelude::Simd<f32, 4> = f32x4::splat(1.0) + density * (flow - f32x4::splat(1.0));
             self.speed[i] = speed;
 
             const DISTANCE_WEIGHT: f32 = 0.2;
@@ -176,38 +180,39 @@ impl<const R: AgentRadius> FlowField<R> {
     }
 
     #[inline]
-    fn build_potential(&mut self, goals: impl Iterator<Item = Cell>, obstacle_field: &ObstacleField) {
-        debug_assert!(self.potential.len() == obstacle_field.len());
+    fn build_potential(&mut self, goals: impl Iterator<Item = Cell>, obstacle: &ObstacleField) {
+        debug_assert!(self.potential.len() == obstacle.len());
 
-        let (potential, heap, cost) = (&mut self.potential, &mut self.heap, &self.cost);
-        for potent in potential.iter_mut() {
+        let (potential, cost, heap, known) = (&mut self.potential, &self.cost, &mut self.heap, &mut self.known);
+
+        for (potent, known) in potential.iter_mut().zip(known.iter_mut()) {
             *potent = f32::INFINITY;
+            *known = false;
         }
 
         heap.clear();
 
         for goal in goals.into_iter() {
-            if !obstacle_field.valid(goal) {
+            if !obstacle.valid(goal) {
                 // FIXME: should we panic here?
                 continue;
             }
             heap.push(goal, notnan!(0.0));
-            potential[goal] = 0.0;
         }
 
         #[inline]
         fn approx_potential<const R: AgentRadius>(
             cell: Cell,
             potential: &Field<f32>,
-            obstacle_field: &ObstacleField,
-            cost_field: &Field<f32x4>,
+            obstacle: &ObstacleField,
+            cost: &Field<f32x4>,
         ) -> f32 {
-            let index = cost_field.index_no_check(cell);
-            let (east, west, north, south) = obstacle_field
+            let index = cost.index_no_check(cell);
+            let (east, west, north, south) = obstacle
                 .neighbors_at(cell, SAMPLE_KERNEL.into_iter())
                 .map(|cell| {
                     if let Some(cell) = cell
-                        && obstacle_field.traversable(cell, R)
+                        && obstacle.traversable(cell, R)
                     {
                         potential[cell]
                     } else {
@@ -216,7 +221,7 @@ impl<const R: AgentRadius> FlowField<R> {
                 })
                 .collect_tuple()
                 .unwrap();
-            let costs = cost_field[index];
+            let costs = cost[index];
             let cost_east = costs[0];
             let cost_west = costs[1];
             let cost_north = costs[2];
@@ -282,16 +287,21 @@ impl<const R: AgentRadius> FlowField<R> {
             solve_4(potential_x, cost_x, potential_y, cost_y)
         }
 
-        while let Some((cell, _)) = heap.pop() {
-            for neighbor in obstacle_field.neighbors(cell).filter(|neighbor| obstacle_field.traversable(*neighbor, R)) {
-                if heap.contains(neighbor) {
-                    continue;
-                }
+        while let Some((cell, potent)) = heap.pop() {
+            if known[cell] {
+                continue;
+            }
 
-                let potent = approx_potential::<R>(neighbor, potential, obstacle_field, cost);
+            potential[cell] = potent.into();
+            known[cell] = true;
+
+            for neighbor in
+                obstacle.neighbors(cell).filter(|&neighbor| !known[neighbor] && obstacle.traversable(neighbor, R))
+            {
+                let potent = approx_potential::<R>(neighbor, potential, obstacle, cost);
                 if potent < potential[neighbor] {
                     potential[neighbor] = potent;
-                    heap.push(neighbor, notnan!(potential[neighbor]));
+                    heap.push(neighbor, notnan!(potent));
                 }
             }
         }
@@ -299,38 +309,27 @@ impl<const R: AgentRadius> FlowField<R> {
 }
 
 #[derive(Clone, Default)]
-struct Heap {
-    heap: BinaryHeap<Reverse<(NotNan<f32>, Cell)>>,
-    contains: Field<bool>,
-}
+struct Heap(BinaryHeap<Reverse<(NotNan<f32>, Cell)>>);
 
 impl Heap {
     #[inline]
     fn new(width: usize, height: usize) -> Self {
-        Self { heap: BinaryHeap::new(), contains: Field::new(width, height, vec![false; width * height]) }
+        Self(BinaryHeap::with_capacity(width * height))
     }
     #[inline]
     fn push(&mut self, cell: Cell, cost: NotNan<f32>) {
-        self.heap.push(Reverse((cost, cell)));
-        self.contains[cell] = true;
+        self.0.push(Reverse((cost, cell)));
     }
 
     #[inline]
     fn pop(&mut self) -> Option<(Cell, NotNan<f32>)> {
-        let Reverse((cost, cell)) = self.heap.pop()?;
-        self.contains[cell] = false;
+        let Reverse((cost, cell)) = self.0.pop()?;
         Some((cell, cost))
     }
-    #[inline]
-    fn contains(&self, cell: Cell) -> bool {
-        self.contains[cell]
-    }
+
     #[inline]
     fn clear(&mut self) {
-        self.heap.clear();
-        for cell in self.contains.iter_mut() {
-            *cell = false;
-        }
+        self.0.clear();
     }
 }
 

@@ -16,13 +16,7 @@ impl Plugin for FlowFieldPlugin {
     fn build(&self, app: &mut App) {
         app_register_types!(CellIndex, Footprint, FlowField<{ AgentRadius::Small }>);
 
-        app.add_systems(
-            FixedUpdate,
-            (
-                // cost::density::update,
-                cost::obstacle::update
-            ),
-        );
+        // app.add_systems(FixedUpdate, (cost::density::update, cost::obstacle::update));
         app.add_systems(
             FixedUpdate,
             (flow::update::<{ AgentRadius::Small }>).after(cost::obstacle::update).after(cost::density::update),

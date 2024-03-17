@@ -3,6 +3,7 @@ use bevy::render::{
     texture::{ImageAddressMode, ImageSampler, ImageSamplerDescriptor},
 };
 
+use self::cursor::{CursorClick, CursorPosition};
 use crate::{
     app_state::AppState,
     asset_management::ImageAssets,
@@ -13,6 +14,7 @@ use crate::{
         flow_field::{cost::CostFields, flow::FlowField, footprint::Footprint, layout::FieldLayout, CellIndex},
         obstacle::Obstacle,
     },
+    player::camera::MainCamera,
     prelude::*,
     util::math::random_point_in_square,
 };
@@ -22,7 +24,7 @@ pub struct InGamePlugin;
 impl Plugin for InGamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(AppState::InGame), setup);
-        // app.add_systems(Update, click);
+        app.add_systems(Update, click);
 
         const DEFAULT_SIZE: (usize, usize) = (50, 50);
         const DEFAULT_CELL_SIZE: f32 = 1.0;
@@ -99,7 +101,7 @@ fn setup(
         .spawn((
             Name::new("target"),
             PbrBundle {
-                mesh: meshes.add(Sphere::new(5.0).mesh().ico(5).unwrap()),
+                mesh: meshes.add(Sphere::new(2.0).mesh().ico(5).unwrap()),
                 material: materials.add(Color::BLUE.with_a(0.33)),
                 transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
                 ..default()
@@ -115,7 +117,7 @@ fn setup(
         .id();
 
     for i in 0..5 {
-        let translation = random_point_in_square(30.0);
+        let translation = random_point_in_square(40.0);
         let radius = thread_rng().gen_range(2.0..3.0);
         let height = thread_rng().gen_range(2.0..6.0);
         commands.spawn((
@@ -136,7 +138,7 @@ fn setup(
     }
     const RADIUS: f32 = 1.0;
     const HALF_RADIUS: f32 = RADIUS / 2.0;
-    for i in 0..50 {
+    for i in 0..0 {
         let translation = random_point_in_square(30.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
         commands.spawn((
@@ -156,23 +158,22 @@ fn setup(
     }
 }
 
-// fn click(
-//     cursor: Res<CursorPosition>,
-//     mut event_reader: EventReader<CursorClick>,
-//     mut fields: Query<(&mut Transform, &mut CellIndex, &FlowField)>,
-//     main_cam: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
-//     field_layout: Res<FieldLayout>,
-// ) {
-//     for cursor_click in event_reader.read() {
-//         if !matches!(cursor_click.button, MouseButton::Right) {
-//             continue;
-//         }
-//         for (mut transform, mut cell_index, _) in &mut fields {
-//             let (camera, camera_transform) = main_cam.get_single().expect("there should be a main camera");
-//             let (origin, direction) = math::world_space_ray_from_ndc(cursor.ndc(), camera, camera_transform);
-//             let position = math::plane_intersection(origin, direction, Vec3::ZERO, Vec3::Y);
-//             transform.translation = position;
-//             **cell_index = field_layout.world_to_cell(position);
-//         }
-//     }
-// }
+fn click(
+    cursor: Res<CursorPosition>,
+    mut event_reader: EventReader<CursorClick>,
+    mut fields: Query<(&mut Transform, &mut CellIndex), With<FlowField<{ AgentRadius::Small }>>>,
+    main_cam: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
+    field_layout: Res<FieldLayout>,
+) {
+    for cursor_click in event_reader.read() {
+        if !matches!(cursor_click.button, MouseButton::Right) {
+            continue;
+        }
+        for (mut transform, mut cell_index) in &mut fields {
+            let (camera, camera_transform) = main_cam.get_single().expect("there should be a main camera");
+            let (origin, direction) = math::world_space_ray_from_ndc(cursor.ndc(), camera, camera_transform);
+            let position = math::plane_intersection(origin, direction, Vec3::ZERO, Vec3::Y);
+            transform.translation = position;
+        }
+    }
+}
