@@ -27,7 +27,7 @@ pub struct Dirty<T: Component>(#[reflect(ignore)] pub PhantomData<T>);
 /// Generic component to mark component [`T`] as deactivated.
 #[derive(Component, Default, Deref, DerefMut, From, Reflect)]
 #[component(storage = "SparseSet")]
-pub struct Deactivated<T: Component>(#[reflect(ignore)] pub PhantomData<T>);
+pub struct Disabled<T: Component>(#[reflect(ignore)] pub PhantomData<T>);
 
 /// Type alias for [`ChangedPhysicsPosition`].
 /// Should be used instead of [`Changed<Transform>`] or [`Changed<GlobalTransform>`]

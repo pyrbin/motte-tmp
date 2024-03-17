@@ -3,73 +3,57 @@ use bevy_xpbd_3d::parry::{
     shape::TypedShape,
 };
 
-use crate::{navigation::agent::DEFAULT_AGENT_HEIGHT, prelude::*};
-
-#[derive(Component, Clone, Reflect)]
-#[reflect(Component)]
-pub struct Obstacle;
+use crate::prelude::*;
 
 #[derive(Component, Clone, Default, Reflect)]
 #[reflect(Component)]
-pub enum Occupancy {
+pub enum Obstacle {
     #[default]
     Empty,
     Shape(SmallVec<[Vec2; 8]>),
 }
 
-impl Occupancy {
-    pub fn shape(&self) -> Option<&[Vec2]> {
-        match self {
-            Occupancy::Empty => None,
-            Occupancy::Shape(shape) => Some(shape),
+impl Obstacle {
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Obstacle::Empty)
+    }
+
+    pub fn line_segments(&self) -> Option<SmallVec<[(Vec2, Vec2); 4]>> {
+        let Obstacle::Shape(shape) = self else {
+            return None;
+        };
+
+        let mut segments = SmallVec::default();
+        for i in 0..shape.len() - 1 {
+            segments.push((shape[i], shape[i + 1]));
         }
+
+        segments.push((shape[shape.len() - 1], shape[0]));
+
+        Some(segments)
     }
 }
 
-#[derive(Component, Clone, Copy, Default, PartialEq, Reflect)]
-#[reflect(Component)]
-pub struct OccupancyAabb {
-    pub min: Vec2,
-    pub max: Vec2,
-}
-
-impl OccupancyAabb {
-    #[inline]
-    pub fn center(self) -> Vec2 {
-        (self.min + self.max) / 2.0
-    }
-    #[inline]
-    pub fn size(self) -> Vec2 {
-        self.max - self.min
-    }
-}
-
-pub(super) fn setup(mut commands: Commands, obstacles: Query<Entity, (With<Obstacle>, Without<Occupancy>)>) {
-    for entity in &obstacles {
-        commands.entity(entity).insert(Occupancy::Empty).insert(OccupancyAabb::default());
-    }
-}
-
-pub(super) fn occupancy(
+pub(super) fn obstacle(
     mut obstacles: Query<
-        (&mut Occupancy, &mut OccupancyAabb, &Collider, &ColliderAabb, &GlobalTransform),
-        Or<(ChangedPhysicsPosition, Changed<Collider>, Changed<ColliderAabb>)>,
+        (&mut Obstacle, &Collider, &ColliderAabb, &GlobalTransform),
+        Or<(Changed<GlobalTransform>, Changed<Collider>, Changed<ColliderAabb>)>,
     >,
 ) {
-    const PLANE_Y: f32 = 0.0;
-    let border_expansion = 1.0;
+    // TODO: sample height if/whenever we have a generated height-field.
+    let plane_height = 0.0;
+    // TODO: we would need another solution to properly support varying agent heights, not a concern for now tho.
+    let max_agent_height = 1.0;
 
-    obstacles.par_iter_mut().for_each(|(mut occupancy, mut occupancy_aabb, collider, aabb, global_transform)| {
-        if aabb.min.y > DEFAULT_AGENT_HEIGHT || aabb.max.y < PLANE_Y {
-            if !matches!(*occupancy, Occupancy::Empty) {
-                *occupancy = Occupancy::Empty;
-                *occupancy_aabb = OccupancyAabb::default();
+    let border_expansion = 0.0;
+
+    obstacles.par_iter_mut().for_each(|(mut obstacle, collider, aabb, global_transform)| {
+        if aabb.min.y > max_agent_height || aabb.max.y < plane_height {
+            if !obstacle.is_empty() {
+                *obstacle = Obstacle::Empty;
             }
             return;
         }
-
-        occupancy_aabb.min = aabb.min.xz() - border_expansion;
-        occupancy_aabb.max = aabb.max.xz() + border_expansion;
 
         const SUBDIVISIONS: u32 = 8;
         let Some((vertices, _)) = (match collider.shape_scaled().as_typed_shape() {
@@ -94,7 +78,7 @@ pub(super) fn occupancy(
             .collect();
 
         if vertices.len() < 3 {
-            *occupancy = Occupancy::Empty;
+            *obstacle = Obstacle::Empty;
             return;
         }
 
@@ -103,9 +87,11 @@ pub(super) fn occupancy(
             .map(|point| transform.transform_point(Vec3::new(point.x, 0.0, point.y)).xz())
             .collect();
 
-        expand_shape(&mut shape, border_expansion);
+        if border_expansion > 0.0 {
+            expand_shape(&mut shape, border_expansion);
+        }
 
-        *occupancy = Occupancy::Shape(shape);
+        *obstacle = Obstacle::Shape(shape);
     });
 }
 
@@ -121,10 +107,19 @@ fn expand_shape(hull: &mut SmallVec<[Vec2; 8]>, expansion: f32) {
     }
 }
 
-pub(super) fn cleanup(mut commands: Commands, mut occupancy: RemovedComponents<Occupancy>) {
-    for entity in &mut occupancy.read() {
-        if let Some(mut commands) = commands.get_entity(entity) {
-            commands.remove::<OccupancyAabb>();
+#[cfg(feature = "debug")]
+pub fn gizmos(mut gizmos: Gizmos, obstacles: Query<&mut Obstacle>) {
+    for obstacle in obstacles.iter() {
+        match obstacle {
+            Obstacle::Empty => {}
+            Obstacle::Shape(_) => {
+                let Some(segments) = obstacle.line_segments() else {
+                    continue;
+                };
+                for (start, end) in segments {
+                    gizmos.line(start.x0y(), end.x0y(), Color::RED);
+                }
+            }
         }
     }
 }

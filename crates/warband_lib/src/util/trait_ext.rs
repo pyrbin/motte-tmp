@@ -1,5 +1,9 @@
 #![allow(unused)]
 
+use std::simd::{f32x4, num::SimdFloat};
+
+use parry2d::na::SimdPartialOrd;
+
 use crate::prelude::*;
 
 pub(crate) trait ColorExt {
@@ -95,7 +99,7 @@ pub(crate) trait Clamp01 {
 impl Clamp01 for f32 {
     #[inline]
     fn clamp01(self) -> Self {
-        self.clamp(0.0, 1.0)
+        self.simd_clamp(0.0, 1.0)
     }
 }
 
@@ -120,26 +124,21 @@ impl Clamp01 for Vec4 {
     }
 }
 
+impl Clamp01 for f32x4 {
+    #[inline]
+    fn clamp01(self) -> Self {
+        self.simd_clamp(f32x4::splat(0.0), f32x4::splat(0.0))
+    }
+}
+
 pub(crate) trait F32Ext: Copy {
     fn is_approx_zero(self) -> bool;
-    fn squared(self) -> f32;
-    fn lerp(self, other: f32, ratio: f32) -> f32;
 }
 
 impl F32Ext for f32 {
     #[inline]
     fn is_approx_zero(self) -> bool {
         self.abs() < f32::EPSILON
-    }
-
-    #[inline]
-    fn squared(self) -> f32 {
-        self * self
-    }
-
-    #[inline]
-    fn lerp(self, other: f32, ratio: f32) -> f32 {
-        self.mul_add(1. - ratio, other * ratio)
     }
 }
 

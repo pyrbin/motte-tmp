@@ -3,20 +3,15 @@ use bevy::render::{
     texture::{ImageAddressMode, ImageSampler, ImageSamplerDescriptor},
 };
 
-use self::cursor::{CursorClick, CursorPosition};
 use crate::{
     app_state::AppState,
     asset_management::ImageAssets,
-    flow_field::{
-        fields::{density::DensityField, CostFields},
-        layout::FieldLayout,
-    },
     graphics::pixelate,
     movement::motor::CharacterMotor,
     navigation::{
-        agent::{Agent, DesiredVelocity, Speed, TargetReachedCondition},
-        avoidance::{Avoidance, AvoidanceOptions},
-        occupancy::Obstacle,
+        agent::{Agent, AgentRadius},
+        flow_field::{cost::CostFields, flow::FlowField, footprint::Footprint, layout::FieldLayout, CellIndex},
+        obstacle::Obstacle,
     },
     prelude::*,
     util::math::random_point_in_square,
@@ -33,17 +28,10 @@ impl Plugin for InGamePlugin {
         const DEFAULT_CELL_SIZE: f32 = 1.0;
 
         let layout = FieldLayout::new(DEFAULT_SIZE.0, DEFAULT_SIZE.1).with_cell_size(DEFAULT_CELL_SIZE);
-        let cost_fields = CostFields { density: DensityField::from_layout(&layout) };
+        let cost_fields = CostFields::from_layout(&layout);
 
         app.insert_resource(layout);
         app.insert_resource(cost_fields);
-
-        app.insert_resource(AvoidanceOptions {
-            obstacle_margin: None,
-            agent_neighborhood: Some(2.0),
-            time_horizon: 3.0,
-            obstacle_time_horizon: 0.5,
-        });
     }
 }
 
@@ -53,6 +41,7 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     image_assets: Res<ImageAssets>,
     mut asset_image: ResMut<Assets<Image>>,
+    layout: Res<FieldLayout>,
 ) {
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight { illuminance: 5000.0, color: Color::WHITE, ..default() },
@@ -106,24 +95,27 @@ fn setup(
         RigidBody::Static,
     ));
 
-    // let target = commands
-    //     .spawn((
-    //         Name::new("target"),
-    //         PbrBundle {
-    //             mesh: meshes.add(Sphere::new(5.0).mesh().ico(5).unwrap()),
-    //             material: materials.add(Color::BLUE.with_a(0.33)),
-    //             transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
-    //             ..default()
-    //         },
-    //         Collider::from(Sphere::new(5.0)),
-    //         RigidBody::Static,
-    //         Obstacle,
-    //         Position::default(),
-    //     ))
-    //     .id();
+    let target = commands
+        .spawn((
+            Name::new("target"),
+            PbrBundle {
+                mesh: meshes.add(Sphere::new(5.0).mesh().ico(5).unwrap()),
+                material: materials.add(Color::BLUE.with_a(0.33)),
+                transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
+                ..default()
+            },
+            Collider::from(Sphere::new(5.0)),
+            RigidBody::Static,
+            FlowField::<{ AgentRadius::Small }>::from_layout(&layout),
+            Position::default(),
+            CellIndex::default(),
+            Obstacle::default(),
+            Footprint::default(),
+        ))
+        .id();
 
-    for i in 0..0 {
-        let translation = random_point_in_square(80.0);
+    for i in 0..5 {
+        let translation = random_point_in_square(30.0);
         let radius = thread_rng().gen_range(2.0..3.0);
         let height = thread_rng().gen_range(2.0..6.0);
         commands.spawn((
@@ -134,17 +126,18 @@ fn setup(
                 transform: Vec3::new(translation.x, 0.0, translation.y).into_transform(),
                 ..default()
             },
+            Obstacle::default(),
+            Footprint::default(),
             Collider::from(Capsule3d::new(radius, height)),
             pixelate::Snap::translation(),
             RigidBody::Static,
-            Obstacle,
             LinearVelocity::ZERO,
         ));
     }
     const RADIUS: f32 = 1.0;
     const HALF_RADIUS: f32 = RADIUS / 2.0;
     for i in 0..50 {
-        let translation = random_point_in_square(40.0);
+        let translation = random_point_in_square(30.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
         commands.spawn((
             Name::new(format!("agent {i}")),
@@ -156,13 +149,9 @@ fn setup(
             },
             CharacterMotor::cylinder(RADIUS, HALF_RADIUS),
             pixelate::Snap::translation(),
-            // Goal::Entity(target),
-            // CellIndex::default(),
-            Agent::default().with_radius(RADIUS),
-            TargetReachedCondition::Distance(RADIUS),
-            Avoidance::default(),
-            DesiredVelocity::default(),
-            Speed::base(500.0),
+            Agent::small(),
+            CellIndex::default(),
+            Footprint::default(),
         ));
     }
 }

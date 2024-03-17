@@ -1,14 +1,17 @@
+#![allow(incomplete_features)]
 #![feature(let_chains)]
 #![feature(if_let_guard)]
 #![feature(const_format_args)]
 #![feature(hash_extract_if)]
 #![feature(adt_const_params)]
-#![allow(incomplete_features)]
+#![feature(iterator_try_collect)]
+#![feature(portable_simd)]
+#![feature(const_trait_impl)]
+#![feature(effects)]
 
 mod app_state;
 mod asset_management;
 mod core;
-mod flow_field;
 mod graphics;
 mod in_game;
 mod movement;
@@ -42,7 +45,6 @@ impl bevy::app::Plugin for Plugin {
             stats::StatsPlugin,
             in_game::InGamePlugin,
             navigation::NavigationPlugin,
-            flow_field::FlowFieldPlugin,
             movement::MovementPlugin,
         ));
     }

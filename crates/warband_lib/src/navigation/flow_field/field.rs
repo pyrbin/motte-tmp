@@ -1,5 +1,7 @@
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
+use parry2d::na::SimdComplexField;
+
 use crate::prelude::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Hash, Deref, DerefMut, From, Reflect)]
@@ -26,13 +28,13 @@ impl Cell {
     #[inline]
     pub fn round((mut x, mut y): (f32, f32)) -> Self {
         let z = -x - y;
-        let rx = x.round();
-        let ry = y.round();
-        let rz = z.round();
+        let rx = x.simd_round();
+        let ry = y.simd_round();
+        let rz = z.simd_round();
 
-        let x_diff = (rx - x).abs();
-        let y_diff = (ry - y).abs();
-        let z_diff = (rz - z).abs();
+        let x_diff = (rx - x).simd_abs();
+        let y_diff = (ry - y).simd_abs();
+        let z_diff = (rz - z).simd_abs();
 
         if x_diff > y_diff && x_diff > z_diff {
             x = -ry - rz;
@@ -40,7 +42,12 @@ impl Cell {
             y = -rx - rz;
         }
 
-        Self((x.round() as usize, y.round() as usize))
+        Self((x.simd_round() as usize, y.simd_round() as usize))
+    }
+
+    #[inline]
+    pub fn floor((x, y): (f32, f32)) -> Self {
+        Self(((x - 0.5).simd_floor() as usize, (y - 0.5).simd_floor() as usize))
     }
 
     #[inline]
@@ -64,8 +71,13 @@ impl Cell {
 
     #[inline]
     pub fn adjacent(self) -> impl Iterator<Item = Cell> {
-        const NEIGHBORS4: [(i32, i32); 4] = [(0, -1), (-1, 0), (1, 0), (0, 1)];
-        NEIGHBORS4.iter().filter_map(move |&(dx, dy)| {
+        const NEIGHBORS: [(i32, i32); 4] = [
+            Direction::North.as_i32x2(),
+            Direction::East.as_i32x2(),
+            Direction::South.as_i32x2(),
+            Direction::West.as_i32x2(),
+        ];
+        NEIGHBORS.iter().filter_map(move |&(dx, dy)| {
             let x = self.x().checked_add_signed(dx as isize);
             let y = self.y().checked_add_signed(dy as isize);
             x.and_then(|x| y.map(|y| Cell::new(x, y)))
@@ -74,8 +86,13 @@ impl Cell {
 
     #[inline]
     pub fn diagonal(self) -> impl Iterator<Item = Cell> {
-        const NEIGHBORS4: [(i32, i32); 4] = [(1, -1), (-1, 1), (1, 1), (-1, -1)];
-        NEIGHBORS4.iter().filter_map(move |&(dx, dy)| {
+        const NEIGHBORS: [(i32, i32); 4] = [
+            Direction::NorthEast.as_i32x2(),
+            Direction::SouthEast.as_i32x2(),
+            Direction::SouthWest.as_i32x2(),
+            Direction::NorthWest.as_i32x2(),
+        ];
+        NEIGHBORS.iter().filter_map(move |&(dx, dy)| {
             let x = self.x().checked_add_signed(dx as isize);
             let y = self.y().checked_add_signed(dy as isize);
             x.and_then(|x| y.map(|y| Cell::new(x, y)))
@@ -88,11 +105,8 @@ impl Cell {
     }
 
     #[inline]
-    pub fn sample_neighbors<'a>(self, directions: &'a [Direction]) -> impl Iterator<Item = (Cell, Direction)> + 'a {
-        directions
-            .iter()
-            .copied()
-            .filter_map(move |direction| self.neighbor(direction).map(|neighbor| (neighbor, direction)))
+    pub fn neighbors_at(self, directions: impl Iterator<Item = Direction>) -> impl Iterator<Item = Option<Cell>> {
+        directions.map(move |d| self.neighbor(d))
     }
 
     #[inline]
@@ -150,6 +164,7 @@ pub fn index_to_cell(index: usize, width: usize) -> Cell {
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Reflect)]
+#[repr(u8)]
 pub enum Direction {
     North,
     NorthEast,
@@ -178,6 +193,25 @@ impl Direction {
             Self::None => None,
         }
     }
+    #[inline]
+    pub const fn as_i32x2(self) -> (i32, i32) {
+        match self {
+            Self::North => (0, -1),
+            Self::NorthEast => (1, -1),
+            Self::East => (1, 0),
+            Self::SouthEast => (1, 1),
+            Self::South => (0, 1),
+            Self::SouthWest => (-1, 1),
+            Self::West => (-1, 0),
+            Self::NorthWest => (-1, -1),
+            Self::None => (0, 0),
+        }
+    }
+
+    #[inline]
+    pub fn as_vec2(self) -> Vec2 {
+        Vec2::new(self.as_i32x2().0 as f32, self.as_i32x2().1 as f32)
+    }
 }
 
 #[derive(Default, Clone, Reflect)]
@@ -192,10 +226,20 @@ impl<T> Field<T> {
         Self { data, width, height }
     }
 
+    /// Returns the 1-dimensional index of a [Cell]. Does not check if the cell is valid for the field.
+    #[inline]
+    pub fn index_no_check(&self, cell: Cell) -> usize {
+        cell_to_index(*cell, self.width)
+    }
+
     /// Returns the 1-dimensional index of a [Cell].
     #[inline]
-    pub fn index(&self, cell: Cell) -> usize {
-        cell_to_index(*cell, self.width)
+    pub fn index(&self, cell: Cell) -> Option<usize> {
+        if self.valid(cell) {
+            Some(cell.index(self.width))
+        } else {
+            None
+        }
     }
 
     /// Returns the 2-dimensional [Cell] of a 1-dimensional index.
@@ -233,9 +277,30 @@ impl<T> Field<T> {
     }
 
     #[inline]
-    #[allow(unused)]
     pub fn neighbors(&self, cell: Cell) -> impl Iterator<Item = Cell> + '_ {
         cell.neighbors().filter(move |&cell| self.valid(cell))
+    }
+
+    #[inline]
+    pub fn neighbor(&self, cell: Cell, direction: Direction) -> Option<Cell> {
+        cell.neighbor(direction).filter(move |&cell| self.valid(cell))
+    }
+
+    #[inline]
+    pub fn neighbors_at<'a>(
+        &'a self,
+        cell: Cell,
+        directions: impl Iterator<Item = Direction> + 'a,
+    ) -> impl Iterator<Item = Option<Cell>> + 'a {
+        cell.neighbors_at(directions).map(
+            move |cell| {
+                if cell.is_some() && self.valid(cell.unwrap()) {
+                    cell
+                } else {
+                    None
+                }
+            },
+        )
     }
 
     #[inline]
@@ -288,14 +353,14 @@ impl<T> Index<Cell> for Field<T> {
     type Output = T;
     #[inline]
     fn index(&self, cell: Cell) -> &T {
-        &self.data[self.index(cell)]
+        &self.data[self.index_no_check(cell)]
     }
 }
 
 impl<T> IndexMut<Cell> for Field<T> {
     #[inline]
     fn index_mut(&mut self, cell: Cell) -> &mut T {
-        let index = self.index(cell);
+        let index = self.index_no_check(cell);
         &mut self.data[index]
     }
 }

@@ -1,7 +1,7 @@
 use super::field::Cell;
 use crate::prelude::*;
 
-#[derive(Default, Reflect)]
+#[derive(Default, Clone, Copy, Reflect)]
 pub enum FieldPosition {
     #[default]
     Centered,
@@ -9,7 +9,7 @@ pub enum FieldPosition {
     Position(Vec2),
 }
 
-#[derive(Resource, Reflect)]
+#[derive(Resource, Clone, Copy, Reflect)]
 pub struct FieldLayout {
     width: usize,
     height: usize,
@@ -37,7 +37,7 @@ impl Default for FieldLayout {
 impl FieldLayout {
     #[inline]
     pub fn cell(&self, global_position_xz: Vec2) -> Cell {
-        let translation = global_position_xz - self.offset();
+        let translation = self.transform_point(global_position_xz);
         Cell::round((translation.x / self.cell_size(), translation.y / self.cell_size()))
     }
 
@@ -52,6 +52,11 @@ impl FieldLayout {
         let world_x = cell.x() as f32 * self.cell_size() + offset.x;
         let world_z = cell.y() as f32 * self.cell_size() + offset.y;
         Vec2::new(world_x, world_z)
+    }
+
+    #[inline]
+    pub fn transform_point(&self, global_position_xz: Vec2) -> Vec2 {
+        global_position_xz - self.offset()
     }
 
     #[inline]
