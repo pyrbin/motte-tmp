@@ -8,6 +8,8 @@
 #![feature(portable_simd)]
 #![feature(const_trait_impl)]
 #![feature(effects)]
+#![feature(const_fn_floating_point_arithmetic)]
+#![feature(anonymous_lifetime_in_impl_trait)]
 
 mod app_state;
 mod asset_management;

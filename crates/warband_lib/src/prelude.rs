@@ -19,6 +19,8 @@ pub(crate) use smallvec::SmallVec;
 pub(crate) use thiserror::Error;
 pub(crate) use warband_macros::*;
 
+#[cfg(feature = "debug")]
+pub(crate) use crate::debug::*;
 pub(crate) use crate::{
     core::{ChangedPhysicsPosition, *},
     stats::stat::Stat,

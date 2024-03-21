@@ -1,10 +1,19 @@
 use bevy_spatial::AutomaticUpdate;
 
-use self::agent::{Agent, AgentRadius};
+use self::agent::Agent;
 use crate::{
-    navigation::{flow_field::FlowFieldPlugin, obstacle::Obstacle},
+    app_state::AppState,
+    movement::MovementSystems,
+    navigation::{
+        agent::{agent_type, AgentType, DesiredVelocity, Seek, Speed, TargetDistance},
+        flow_field::{FlowFieldAgentPlugin, FlowFieldPlugin, FlowFieldSystems},
+        obstacle::Obstacle,
+    },
     prelude::*,
+    stats::stat::StatPlugin,
 };
+
+// TODO: Resource for RebuildFlows* RebuildObstacle* unsafe poke for when to trigger rebuild.
 
 pub mod agent;
 pub mod flow_field;
@@ -22,11 +31,52 @@ pub struct NavigationPlugin;
 
 impl Plugin for NavigationPlugin {
     fn build(&self, app: &mut App) {
-        app_register_types!(Agent, AgentRadius, Obstacle);
+        app_register_types!(Agent, Obstacle, Seek, TargetDistance, DesiredVelocity, Speed);
 
         app.add_plugins(FlowFieldPlugin);
-        app.add_plugins(AutomaticUpdate::<agent::Agent>::new());
+        app.add_plugins((AutomaticUpdate::<agent::Agent>::new(), AutomaticUpdate::<obstacle::Obstacle>::new()));
+        app.add_plugins(StatPlugin::<Speed>::default());
 
-        app.add_systems(FixedUpdate, obstacle::obstacle);
+        app.add_plugins(AgentPlugin::<{ Agent::Small }>);
+        app.add_plugins(AgentPlugin::<{ Agent::Medium }>);
+        app.add_plugins(AgentPlugin::<{ Agent::Large }>);
+        app.add_plugins(AgentPlugin::<{ Agent::Huge }>);
+
+        app.configure_sets(FixedUpdate, NavigationSystems::Setup.run_if(in_state(AppState::InGame)));
+        app.configure_sets(
+            FixedPostUpdate,
+            (
+                NavigationSystems::Maintain.before(FlowFieldSystems::Maintain),
+                NavigationSystems::ApplyVelocity.after(FlowFieldSystems::Seek).before(MovementSystems::Motor),
+            )
+                .chain()
+                .before(PhysicsSet::Prepare)
+                .run_if(in_state(AppState::InGame)),
+        );
+        app.configure_sets(
+            FixedLast,
+            (NavigationSystems::Cleanup).after(MovementSystems::State).run_if(in_state(AppState::InGame)),
+        );
+
+        app.add_systems(FixedUpdate, (agent::setup).in_set(NavigationSystems::Setup));
+        app.add_systems(
+            FixedPostUpdate,
+            (
+                obstacle::obstacle.in_set(NavigationSystems::Maintain),
+                (agent::seek, agent::apply_velocity).chain().in_set(NavigationSystems::ApplyVelocity),
+            ),
+        );
+        app.add_systems(FixedLast, (agent::target_reached).in_set(NavigationSystems::Cleanup));
+    }
+}
+
+struct AgentPlugin<const AGENT: Agent>;
+
+impl<const AGENT: Agent> Plugin for AgentPlugin<AGENT> {
+    fn build(&self, app: &mut App) {
+        app_register_types!(AgentType<AGENT>);
+
+        app.add_plugins(FlowFieldAgentPlugin::<AGENT>);
+        app.add_systems(FixedUpdate, agent_type::<AGENT>.in_set(NavigationSystems::Setup));
     }
 }

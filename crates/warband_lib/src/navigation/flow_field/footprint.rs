@@ -1,11 +1,12 @@
 use bevy_xpbd_3d::parry::na::{Const, OPoint};
 
-use super::{field::Cell, layout::FieldLayout, CellIndex};
+use super::{fields::Cell, layout::FieldLayout, CellIndex};
 use crate::{
     navigation::{agent::Agent, obstacle::Obstacle},
     prelude::*,
 };
 
+/// Footprint of an entity on the field.
 #[derive(Component, Default, Reflect)]
 #[reflect(Component)]
 pub enum Footprint {
@@ -20,7 +21,16 @@ impl Footprint {
     }
 
     #[inline]
+    pub fn cells(&self) -> Option<&[Cell]> {
+        if let Footprint::Cells(cells) = self {
+            return Some(cells);
+        }
+        None
+    }
+
+    #[inline]
     pub fn expand(&self, radius: usize) -> Option<impl Iterator<Item = Cell> + '_> {
+        debug_assert!(radius > 0);
         if let Footprint::Cells(cells) = self {
             return Some(cells.iter().flat_map(move |&cell| {
                 (-(radius as isize)..=radius as isize).flat_map(move |dx| {
@@ -28,7 +38,7 @@ impl Footprint {
                         let x = (cell.x() as isize + dx) as usize;
                         let y = (cell.y() as isize + dy) as usize;
                         let expanded_cell = Cell::new(x, y);
-                        if cell.manhattan(expanded_cell) <= radius {
+                        if cell.coordinate_distance(expanded_cell) <= radius {
                             Some(expanded_cell)
                         } else {
                             None
@@ -58,7 +68,7 @@ pub(super) fn agents(
             let layout = *layout;
             let border_radius = layout.cell_size() / 4.0;
 
-            let agent_radius: f32 = agent.radius().into();
+            let agent_radius: f32 = agent.radius();
             let agent_position = global_transform.translation().xz();
 
             let min_cell = layout.cell(Vec2::new(
@@ -86,7 +96,7 @@ pub(super) fn agents(
 }
 
 pub(super) fn obstacles(
-    mut obstacles: Query<(&mut Footprint, &Obstacle, &ColliderAabb), Changed<Obstacle>>,
+    mut obstacles: Query<(&mut Footprint, &Obstacle, &ColliderAabb), (Changed<Obstacle>, Without<Agent>)>,
     layout: Res<FieldLayout>,
 ) {
     obstacles.par_iter_mut().for_each(|(mut footprint, obstacle, aabb)| {
@@ -117,6 +127,56 @@ pub(super) fn obstacles(
                 .collect(),
         );
     });
+}
+
+/// A [`Footprint`] expanded to size how given [`Agent`] views it when on the field.
+#[derive(Component, Default, Reflect)]
+#[reflect(Component)]
+pub enum ExpandedFootprint<const AGENT: Agent> {
+    #[default]
+    Empty,
+    Cells(SmallVec<[Cell; 8]>),
+}
+
+pub(super) fn setup_expand<const AGENT: Agent>(
+    commands: ParallelCommands,
+    agents: Query<Entity, Added<Footprint>>,
+    mut removed: RemovedComponents<ExpandedFootprint<AGENT>>,
+) {
+    agents.par_iter().for_each(|entity| {
+        commands.command_scope(|mut c| {
+            c.entity(entity).insert(ExpandedFootprint::<AGENT>::default());
+        })
+    });
+
+    for entity in &mut removed.read() {
+        commands.command_scope(|mut c| {
+            if let Some(mut commands) = c.get_entity(entity) {
+                commands.remove::<ExpandedFootprint<AGENT>>();
+            }
+        });
+    }
+}
+
+pub(super) fn expand<const AGENT: Agent>(
+    mut footprints: Query<(&Footprint, &mut ExpandedFootprint<AGENT>), Changed<Footprint>>,
+) {
+    let expansion = AGENT.radius().ceil();
+    footprints.par_iter_mut().for_each(|(footprint, mut expanded_footprint)| {
+        if expansion <= 0.0 {
+            let Footprint::Cells(cells) = footprint else {
+                *expanded_footprint = ExpandedFootprint::Empty;
+                return;
+            };
+            *expanded_footprint = ExpandedFootprint::Cells(cells.clone());
+        }
+
+        let Some(cells) = footprint.expand(AGENT.radius().ceil() as usize) else {
+            *expanded_footprint = ExpandedFootprint::Empty;
+            return;
+        };
+        *expanded_footprint = ExpandedFootprint::Cells(cells.collect());
+    })
 }
 
 #[cfg(feature = "debug")]

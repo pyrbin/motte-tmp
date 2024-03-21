@@ -32,20 +32,20 @@ impl Plugin for MovementPlugin {
 
         app.add_plugins(StatPlugin::<JumpHeight>::default());
 
-        app.configure_sets(Update, (MovementSystems::Setup).chain().run_if(in_state(AppState::InGame)));
+        app.configure_sets(FixedUpdate, (MovementSystems::Setup).chain().run_if(in_state(AppState::InGame)));
         app.configure_sets(
-            PostUpdate,
+            FixedPostUpdate,
             (MovementSystems::Motor).chain().before(PhysicsSet::Prepare).run_if(in_state(AppState::InGame)),
         );
         app.configure_sets(Last, (MovementSystems::State).chain().run_if(in_state(AppState::InGame)));
 
         app.add_systems(
-            PostUpdate,
+            FixedPostUpdate,
             (motor::jumping, (motor::movement, motor::damping).chain()).in_set(MovementSystems::Motor),
         );
 
         app.add_systems(
-            Last,
+            FixedLast,
             (
                 (motor::grounded, motor::stationary),
                 (

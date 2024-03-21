@@ -2,6 +2,9 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 use parry2d::na::SimdComplexField;
 
+pub mod flow;
+pub mod obstacle;
+
 use crate::prelude::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Hash, Deref, DerefMut, From, Reflect)]
@@ -46,11 +49,6 @@ impl Cell {
     }
 
     #[inline]
-    pub fn floor((x, y): (f32, f32)) -> Self {
-        Self(((x - 0.5).simd_floor() as usize, (y - 0.5).simd_floor() as usize))
-    }
-
-    #[inline]
     pub fn x(&self) -> usize {
         self.0 .0
     }
@@ -67,6 +65,23 @@ impl Cell {
     #[inline]
     pub fn manhattan(self, rhs: Cell) -> usize {
         (self.x() as isize - rhs.x() as isize).unsigned_abs() + (self.y() as isize - rhs.y() as isize).unsigned_abs()
+    }
+
+    #[inline]
+    pub fn euclidean(self, rhs: Cell) -> f32 {
+        self.euclidean_sqrt(rhs).sqrt()
+    }
+
+    #[inline]
+    pub fn euclidean_sqrt(self, rhs: Cell) -> f32 {
+        let dx = self.x() as f32 - rhs.x() as f32;
+        let dy = self.y() as f32 - rhs.y() as f32;
+        dx * dx + dy * dy
+    }
+
+    #[inline]
+    pub fn coordinate_distance(self, rhs: Cell) -> usize {
+        self.x().abs_diff(rhs.x()).max(self.y().abs_diff(rhs.y()))
     }
 
     #[inline]
@@ -180,6 +195,28 @@ pub enum Direction {
 
 impl Direction {
     #[inline]
+    pub fn from_vec(vec: Vec2) -> Self {
+        let normalized = vec.normalize_or_zero();
+        if normalized == Vec2::ZERO {
+            return Self::None;
+        }
+        let x = normalized.x.round();
+        let y = normalized.y.round();
+
+        match (x, y) {
+            (0.0, -1.0) => Self::North,
+            (1.0, -1.0) => Self::NorthEast,
+            (1.0, 0.0) => Self::East,
+            (1.0, 1.0) => Self::SouthEast,
+            (0.0, 1.0) => Self::South,
+            (-1.0, 1.0) => Self::SouthWest,
+            (-1.0, 0.0) => Self::West,
+            (-1.0, -1.0) => Self::NorthWest,
+            _ => Self::None,
+        }
+    }
+
+    #[inline]
     pub fn as_direction2d(self) -> Option<Direction2d> {
         match self {
             Self::North => Direction2d::from_xy(0.0, -1.0).ok(),
@@ -244,7 +281,16 @@ impl<T> Field<T> {
 
     /// Returns the 2-dimensional [Cell] of a 1-dimensional index.
     #[inline]
-    pub fn cell(&self, index: usize) -> Cell {
+    pub fn cell(&self, index: usize) -> Option<Cell> {
+        if index >= self.len() {
+            return None;
+        }
+        Some(index_to_cell(index, self.width))
+    }
+
+    /// Returns the 2-dimensional [Cell] of a 1-dimensional index.
+    #[inline]
+    pub fn cell_no_check(&self, index: usize) -> Cell {
         index_to_cell(index, self.width)
     }
 

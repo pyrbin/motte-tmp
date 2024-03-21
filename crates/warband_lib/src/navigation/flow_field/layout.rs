@@ -1,36 +1,34 @@
-use super::field::Cell;
+use super::fields::Cell;
 use crate::prelude::*;
-
-#[derive(Default, Clone, Copy, Reflect)]
-pub enum FieldPosition {
-    #[default]
-    Centered,
-    Origin,
-    Position(Vec2),
-}
 
 #[derive(Resource, Clone, Copy, Reflect)]
 pub struct FieldLayout {
     width: usize,
     height: usize,
     cell_size: f32,
-    position: FieldPosition,
+    offset: Vec2,
 }
 
 impl FieldLayout {
     pub fn new(width: usize, height: usize) -> Self {
-        Self { width, height, ..Default::default() }
+        let mut layout = Self { width, height, ..Default::default() };
+        layout.offset = centered_offset(layout.cell_size, layout.width, layout.height);
+        layout
     }
 
     pub fn with_cell_size(mut self, cell_size: f32) -> Self {
         self.cell_size = cell_size;
+        self.offset = centered_offset(self.cell_size, self.width, self.height);
         self
     }
 }
 
 impl Default for FieldLayout {
     fn default() -> Self {
-        Self { width: 64, height: 64, cell_size: 1.0, position: FieldPosition::Centered }
+        const WIDTH: usize = 64;
+        const HEIGHT: usize = 64;
+        const CELL: f32 = 1.0;
+        Self { width: WIDTH, height: HEIGHT, cell_size: CELL, offset: centered_offset(CELL, WIDTH, HEIGHT) }
     }
 }
 
@@ -73,6 +71,7 @@ impl FieldLayout {
         cell.x() < self.width && cell.y() < self.height
     }
 
+    #[inline]
     pub fn cell_size(&self) -> f32 {
         self.cell_size.max(f32::EPSILON)
     }
@@ -94,25 +93,19 @@ impl FieldLayout {
 
     #[inline]
     fn offset(&self) -> Vec2 {
-        let half_size = self.cell_size() / 2.0;
-        match self.position {
-            FieldPosition::Centered => Vec2::new(
-                -(self.width() as f32 / 2.0) * self.cell_size() + half_size,
-                -(self.height() as f32 / 2.0) * self.cell_size() + half_size,
-            ),
-            FieldPosition::Origin => Vec2::ZERO,
-            FieldPosition::Position(v) => v,
-        }
+        self.offset
     }
 
     #[inline]
-    pub fn center(&self) -> Vec2 {
-        match self.position {
-            FieldPosition::Centered => Vec2::ZERO,
-            FieldPosition::Origin => Vec2::ZERO,
-            FieldPosition::Position(v) => v,
-        }
+    pub const fn center(&self) -> Vec2 {
+        Vec2::ZERO
     }
+}
+
+#[inline]
+fn centered_offset(cell_size: f32, width: usize, height: usize) -> Vec2 {
+    let half_size = cell_size / 2.0;
+    Vec2::new(-(width as f32 / 2.0) * cell_size + half_size, -(height as f32 / 2.0) * cell_size + half_size)
 }
 
 #[cfg(feature = "debug")]

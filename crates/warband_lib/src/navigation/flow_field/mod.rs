@@ -1,29 +1,96 @@
-use self::{field::Cell, footprint::Footprint, layout::FieldLayout};
+use self::{fields::Cell, footprint::Footprint, layout::FieldLayout};
 use crate::{
-    navigation::{agent::AgentRadius, flow_field::flow::FlowField},
+    app_state::AppState,
+    navigation::{
+        agent::Agent,
+        flow_field::{cache::FlowFieldCache, fields::flow::FlowField},
+    },
     prelude::*,
 };
 
-pub mod cost;
-pub mod field;
-pub mod flow;
+pub mod cache;
+pub mod fields;
 pub mod footprint;
 pub mod layout;
+pub mod pathing;
+
+#[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum FlowFieldSystems {
+    Setup,
+    Maintain,
+    Splat,
+    Build,
+    Seek,
+    Cleanup,
+}
 
 pub struct FlowFieldPlugin;
 
 impl Plugin for FlowFieldPlugin {
     fn build(&self, app: &mut App) {
-        app_register_types!(CellIndex, Footprint, FlowField<{ AgentRadius::Small }>);
+        app_register_types!(CellIndex, Footprint);
 
-        // app.add_systems(FixedUpdate, (cost::density::update, cost::obstacle::update));
+        app.configure_sets(FixedUpdate, (FlowFieldSystems::Setup).chain().run_if(in_state(AppState::InGame)));
+        app.configure_sets(
+            FixedPostUpdate,
+            (FlowFieldSystems::Maintain, FlowFieldSystems::Splat, FlowFieldSystems::Build, FlowFieldSystems::Seek)
+                .chain()
+                .run_if(in_state(AppState::InGame)),
+        );
+        app.configure_sets(FixedLast, (FlowFieldSystems::Cleanup).chain().run_if(in_state(AppState::InGame)));
+
         app.add_systems(
-            FixedUpdate,
-            (flow::update::<{ AgentRadius::Small }>).after(cost::obstacle::update).after(cost::density::update),
+            FixedPostUpdate,
+            (cell_index, (footprint::agents, footprint::obstacles)).chain().in_set(FlowFieldSystems::Maintain),
         );
 
-        app.add_systems(FixedUpdate, (footprint::agents, footprint::obstacles));
-        app.add_systems(FixedUpdate, cell_index);
+        app.add_systems(
+            FixedPostUpdate,
+            (
+                fields::obstacle::clear,
+                // Would like to put this into [`FlowFieldAgentPlugin`], but not sure how to ensure the order.
+                // The order is important, should be splatting from large to small.
+                fields::obstacle::splat::<{ Agent::Huge }>,
+                fields::obstacle::splat::<{ Agent::Large }>,
+                fields::obstacle::splat::<{ Agent::Medium }>,
+                fields::obstacle::splat::<{ Agent::Small }>,
+            )
+                .chain()
+                .in_set(FlowFieldSystems::Splat),
+        );
+    }
+}
+
+pub struct FlowFieldAgentPlugin<const AGENT: Agent>;
+
+impl<const AGENT: Agent> Plugin for FlowFieldAgentPlugin<AGENT> {
+    fn build(&self, app: &mut App) {
+        app_register_types!(FlowField<AGENT>, FlowFieldCache<AGENT>);
+
+        app.insert_resource(FlowFieldCache::<AGENT>::default());
+
+        app.add_systems(
+            FixedUpdate,
+            (cache::spawn::<AGENT>, cache::insert::<AGENT>, footprint::setup_expand::<AGENT>)
+                .in_set(FlowFieldSystems::Setup),
+        );
+        app.add_systems(
+            FixedPostUpdate,
+            (
+                cache::tick::<AGENT>,
+                cache::despawn::<AGENT>,
+                footprint::expand::<AGENT>.after(footprint::agents).after(footprint::obstacles),
+            )
+                .in_set(FlowFieldSystems::Maintain),
+        );
+        app.add_systems(
+            FixedPostUpdate,
+            (
+                fields::flow::build::<AGENT>.in_set(FlowFieldSystems::Build),
+                pathing::seek::<AGENT>.in_set(FlowFieldSystems::Seek),
+            ),
+        );
+        app.add_systems(FixedLast, (cache::despawn::<AGENT>).in_set(FlowFieldSystems::Cleanup));
     }
 }
 

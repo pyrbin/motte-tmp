@@ -108,7 +108,7 @@ fn expand_shape(hull: &mut SmallVec<[Vec2; 8]>, expansion: f32) {
 }
 
 #[cfg(feature = "debug")]
-pub fn gizmos(mut gizmos: Gizmos, obstacles: Query<&mut Obstacle>) {
+pub(crate) fn gizmos(mut gizmos: Gizmos, obstacles: Query<&mut Obstacle>) {
     for obstacle in obstacles.iter() {
         match obstacle {
             Obstacle::Empty => {}

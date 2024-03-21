@@ -10,8 +10,10 @@ use crate::{
     graphics::pixelate,
     movement::motor::CharacterMotor,
     navigation::{
-        agent::{Agent, AgentRadius},
-        flow_field::{cost::CostFields, flow::FlowField, footprint::Footprint, layout::FieldLayout, CellIndex},
+        agent::{Agent, Speed},
+        flow_field::{
+            fields::obstacle::ObstacleField, footprint::Footprint, layout::FieldLayout, pathing::Goal, CellIndex,
+        },
         obstacle::Obstacle,
     },
     player::camera::MainCamera,
@@ -26,16 +28,19 @@ impl Plugin for InGamePlugin {
         app.add_systems(OnEnter(AppState::InGame), setup);
         app.add_systems(Update, click);
 
-        const DEFAULT_SIZE: (usize, usize) = (50, 50);
+        const DEFAULT_SIZE: (usize, usize) = (16 * 8, 9 * 8);
         const DEFAULT_CELL_SIZE: f32 = 1.0;
 
         let layout = FieldLayout::new(DEFAULT_SIZE.0, DEFAULT_SIZE.1).with_cell_size(DEFAULT_CELL_SIZE);
-        let cost_fields = CostFields::from_layout(&layout);
+        let obstacles = ObstacleField::from_layout(&layout);
 
         app.insert_resource(layout);
-        app.insert_resource(cost_fields);
+        app.insert_resource(obstacles);
     }
 }
+
+#[derive(Component)]
+pub struct Target;
 
 fn setup(
     mut commands: Commands,
@@ -43,7 +48,6 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     image_assets: Res<ImageAssets>,
     mut asset_image: ResMut<Assets<Image>>,
-    layout: Res<FieldLayout>,
 ) {
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight { illuminance: 5000.0, color: Color::WHITE, ..default() },
@@ -101,57 +105,72 @@ fn setup(
         .spawn((
             Name::new("target"),
             PbrBundle {
-                mesh: meshes.add(Sphere::new(2.0).mesh().ico(5).unwrap()),
+                mesh: meshes.add(Sphere::new(3.0).mesh().ico(5).unwrap()),
                 material: materials.add(Color::BLUE.with_a(0.33)),
                 transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
                 ..default()
             },
-            Collider::from(Sphere::new(5.0)),
+            Collider::from(Sphere::new(3.0)),
             RigidBody::Static,
-            FlowField::<{ AgentRadius::Small }>::from_layout(&layout),
             Position::default(),
-            CellIndex::default(),
-            Obstacle::default(),
             Footprint::default(),
+            Obstacle::default(),
+            CellIndex::default(),
+            Target,
         ))
         .id();
 
-    for i in 0..5 {
-        let translation = random_point_in_square(40.0);
+    for i in 0..10 {
+        let translation = random_point_in_square(70.0);
         let radius = thread_rng().gen_range(2.0..3.0);
         let height = thread_rng().gen_range(2.0..6.0);
+        let shape = thread_rng().gen_range(0..2) >= 1;
+
         commands.spawn((
             Name::new(format!("obstacle {i}")),
             PbrBundle {
-                mesh: meshes.add(Mesh::from(Capsule3d::new(radius, height))),
-                material: materials.add(Color::RED.with_a(0.5)),
+                mesh: meshes.add(if shape {
+                    Mesh::from(Capsule3d::new(radius, height))
+                } else {
+                    Mesh::from(Cuboid { half_size: Vec3::ONE * height })
+                }),
+                material: materials.add(Color::PURPLE),
                 transform: Vec3::new(translation.x, 0.0, translation.y).into_transform(),
                 ..default()
             },
-            Obstacle::default(),
             Footprint::default(),
-            Collider::from(Capsule3d::new(radius, height)),
+            if shape {
+                Collider::from(Capsule3d::new(radius, height))
+            } else {
+                Collider::from(Cuboid { half_size: Vec3::ONE * height })
+            },
             pixelate::Snap::translation(),
             RigidBody::Static,
             LinearVelocity::ZERO,
+            Obstacle::default(),
+            CellIndex::default(),
         ));
     }
     const RADIUS: f32 = 1.0;
     const HALF_RADIUS: f32 = RADIUS / 2.0;
-    for i in 0..0 {
+
+    for i in 0..15 {
+        let agent = Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())].clone();
         let translation = random_point_in_square(30.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
         commands.spawn((
             Name::new(format!("agent {i}")),
             PbrBundle {
-                mesh: meshes.add(Mesh::from(Cylinder { radius: HALF_RADIUS, half_height: HALF_RADIUS })),
+                mesh: meshes.add(Mesh::from(Cylinder { radius: agent.radius(), half_height: agent.height() / 2.0 })),
                 material: materials.add(Color::GREEN.with_a(0.75)),
                 transform,
                 ..default()
             },
+            Goal::Entity(target),
             CharacterMotor::cylinder(RADIUS, HALF_RADIUS),
             pixelate::Snap::translation(),
-            Agent::small(),
+            agent,
+            Speed::base(100.0),
             CellIndex::default(),
             Footprint::default(),
         ));
@@ -161,15 +180,15 @@ fn setup(
 fn click(
     cursor: Res<CursorPosition>,
     mut event_reader: EventReader<CursorClick>,
-    mut fields: Query<(&mut Transform, &mut CellIndex), With<FlowField<{ AgentRadius::Small }>>>,
+    mut fields: Query<(&mut Transform, &mut CellIndex), With<Target>>,
     main_cam: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
-    field_layout: Res<FieldLayout>,
+    _field_layout: Res<FieldLayout>,
 ) {
     for cursor_click in event_reader.read() {
         if !matches!(cursor_click.button, MouseButton::Right) {
             continue;
         }
-        for (mut transform, mut cell_index) in &mut fields {
+        for (mut transform, _cell_index) in &mut fields {
             let (camera, camera_transform) = main_cam.get_single().expect("there should be a main camera");
             let (origin, direction) = math::world_space_ray_from_ndc(cursor.ndc(), camera, camera_transform);
             let position = math::plane_intersection(origin, direction, Vec3::ZERO, Vec3::Y);
