@@ -202,17 +202,24 @@ impl Direction {
         }
         let x = normalized.x.round();
         let y = normalized.y.round();
-
-        match (x, y) {
-            (0.0, -1.0) => Self::North,
-            (1.0, -1.0) => Self::NorthEast,
-            (1.0, 0.0) => Self::East,
-            (1.0, 1.0) => Self::SouthEast,
-            (0.0, 1.0) => Self::South,
-            (-1.0, 1.0) => Self::SouthWest,
-            (-1.0, 0.0) => Self::West,
-            (-1.0, -1.0) => Self::NorthWest,
-            _ => Self::None,
+        if x == 0.0 && y == -1.0 {
+            Self::North
+        } else if x == 1.0 && y == -1.0 {
+            Self::NorthEast
+        } else if x == 1.0 && y == 0.0 {
+            Self::East
+        } else if x == 1.0 && y == 1.0 {
+            Self::SouthEast
+        } else if x == 0.0 && y == 1.0 {
+            Self::South
+        } else if x == -1.0 && y == 1.0 {
+            Self::SouthWest
+        } else if x == -1.0 && y == 0.0 {
+            Self::West
+        } else if x == -1.0 && y == -1.0 {
+            Self::NorthWest
+        } else {
+            Self::None
         }
     }
 
@@ -367,6 +374,11 @@ impl<T> Field<T> {
     #[inline]
     pub fn height(&self) -> usize {
         self.height
+    }
+
+    #[inline]
+    pub fn center(&self) -> Cell {
+        Cell::new(self.width / 2, self.height / 2)
     }
 
     #[inline]

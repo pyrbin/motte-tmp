@@ -5,8 +5,8 @@ use crate::{
     navigation::{
         agent::Agent,
         flow_field::{
-            footprint::{ExpandedFootprint, Footprint},
-            layout::FieldLayout,
+            footprint::ExpandedFootprint,
+            layout::{FieldBounds, FieldLayout},
             CellIndex,
         },
         obstacle::Obstacle,
@@ -46,6 +46,7 @@ impl<const AGENT: Agent> FlowField<AGENT> {
         goals: impl Iterator<Item = Cell>,
         obstacle_field: &ObstacleField,
         obstacles: impl Iterator<Item = (Cell, &[Cell])>,
+        bounds: &[Cell],
     ) {
         debug_assert!(self.len() == obstacle_field.len());
 
@@ -123,6 +124,7 @@ impl<const AGENT: Agent> FlowField<AGENT> {
             }
         }
 
+        // obstacles
         for (origin, footprint) in obstacles {
             for &cell in footprint {
                 if !flow.valid(cell) || integration[cell] == IntegrationCost::Goal {
@@ -138,6 +140,13 @@ impl<const AGENT: Agent> FlowField<AGENT> {
 
                 flow[cell] = Direction::from_vec(direction);
             }
+        }
+
+        // field bounds
+        let center = flow.center();
+        for &cell in bounds {
+            let direction = (center.as_vec2() - cell.as_vec2()).normalize_or_zero();
+            flow[cell] = Direction::from_vec(direction);
         }
     }
 }
@@ -221,6 +230,7 @@ pub(in crate::navigation) fn build<const AGENT: Agent>(
     mut flow_fields: Query<(&mut FlowField<AGENT>, &CellIndex, Option<&ExpandedFootprint<AGENT>>)>,
     obstacle_field: Res<ObstacleField>,
     obstacles: Query<(&ExpandedFootprint<AGENT>, &CellIndex), With<Obstacle>>,
+    bounds: Res<FieldBounds<AGENT>>,
 ) {
     // TODO: should just rebuild if needed
 
@@ -245,6 +255,7 @@ pub(in crate::navigation) fn build<const AGENT: Agent>(
                     return None;
                 }
             }),
+            bounds.as_slice(),
         );
 
         let end = std::time::Instant::now() - now;

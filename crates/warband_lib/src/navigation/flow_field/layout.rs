@@ -1,5 +1,7 @@
+use bevy::log::tracing_subscriber::field;
+
 use super::fields::Cell;
-use crate::prelude::*;
+use crate::{navigation::agent::Agent, prelude::*};
 
 #[derive(Resource, Clone, Copy, Reflect)]
 pub struct FieldLayout {
@@ -7,6 +9,15 @@ pub struct FieldLayout {
     height: usize,
     cell_size: f32,
     offset: Vec2,
+}
+
+impl Default for FieldLayout {
+    fn default() -> Self {
+        const WIDTH: usize = 64;
+        const HEIGHT: usize = 64;
+        const CELL: f32 = 1.0;
+        Self { width: WIDTH, height: HEIGHT, cell_size: CELL, offset: centered_offset(CELL, WIDTH, HEIGHT) }
+    }
 }
 
 impl FieldLayout {
@@ -21,18 +32,7 @@ impl FieldLayout {
         self.offset = centered_offset(self.cell_size, self.width, self.height);
         self
     }
-}
 
-impl Default for FieldLayout {
-    fn default() -> Self {
-        const WIDTH: usize = 64;
-        const HEIGHT: usize = 64;
-        const CELL: f32 = 1.0;
-        Self { width: WIDTH, height: HEIGHT, cell_size: CELL, offset: centered_offset(CELL, WIDTH, HEIGHT) }
-    }
-}
-
-impl FieldLayout {
     #[inline]
     pub fn cell(&self, global_position_xz: Vec2) -> Cell {
         let translation = self.transform_point(global_position_xz);
@@ -100,6 +100,29 @@ impl FieldLayout {
     pub const fn center(&self) -> Vec2 {
         Vec2::ZERO
     }
+
+    #[inline]
+    pub fn bounds(&self, agent: Agent) -> impl Iterator<Item = Cell> {
+        let width = self.width();
+        let height = self.height();
+        let offset = agent.radius().ceil() as usize;
+        let top_bottom = (0..width).flat_map(move |x| {
+            std::iter::once(Cell::new(x, offset - 1)).chain(std::iter::once(Cell::new(x, height - offset)))
+        });
+        let left_right = (1..height - offset).flat_map(move |y| {
+            std::iter::once(Cell::new(offset - 1, y)).chain(std::iter::once(Cell::new(width - offset, y)))
+        });
+
+        top_bottom.chain(left_right)
+    }
+}
+
+#[derive(Resource, Default, Deref, DerefMut, Reflect)]
+pub struct FieldBounds<const AGENT: Agent>(Vec<Cell>);
+
+pub(super) fn field_bounds<const AGENT: Agent>(layout: Res<FieldLayout>, mut field_bounds: ResMut<FieldBounds<AGENT>>) {
+    let bounds = Agent::ALL.iter().filter(|a| a.radius() <= AGENT.radius()).flat_map(|a| layout.bounds(*a));
+    **field_bounds = bounds.collect();
 }
 
 #[inline]

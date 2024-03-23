@@ -4,7 +4,7 @@ use crate::{
         flow_field::{
             fields::{Cell, Field},
             footprint::{ExpandedFootprint, Footprint},
-            layout::FieldLayout,
+            layout::{FieldBounds, FieldLayout},
         },
         obstacle::Obstacle,
     },
@@ -20,8 +20,8 @@ impl ObstacleField {
     }
 
     #[inline(always)]
-    pub fn splat(&mut self, footprint: &[Cell], cost: Cost) {
-        for &cell in footprint {
+    pub fn splat(&mut self, cells: &[Cell], cost: Cost) {
+        for &cell in cells {
             if !self.valid(cell) {
                 continue;
             }
@@ -69,17 +69,15 @@ pub(in crate::navigation) fn clear(mut obstacle_field: ResMut<ObstacleField>) {
 pub(in crate::navigation) fn splat<const AGENT: Agent>(
     mut obstacle_field: ResMut<ObstacleField>,
     obstacles: Query<&ExpandedFootprint<AGENT>, With<Obstacle>>,
+    bounds: Res<FieldBounds<AGENT>>,
 ) {
     for expanded_footprint in &obstacles {
         if let ExpandedFootprint::Cells(cells) = expanded_footprint {
-            obstacle_field.splat(cells, expanded_traversable(AGENT));
+            obstacle_field.splat(cells.as_slice(), expanded_traversable(AGENT));
         }
     }
-}
 
-#[inline(always)]
-pub(in crate::navigation) fn splat_world_bounds(mut obstacle_field: ResMut<ObstacleField>, layout: Res<FieldLayout>) {
-    // TODO: world bounds
+    obstacle_field.splat(bounds.as_slice(), expanded_traversable(AGENT));
 }
 
 /// Cost of cells that exist in [`ExpandedFootprint<{ `agent` }>`].
@@ -100,7 +98,7 @@ pub(crate) fn gizmos(mut gizmos: Gizmos, layout: Res<FieldLayout>, obstacle_fiel
         let color = match cost {
             Cost::Blocked => Color::RED,
             Cost::Traversable(radius) if radius == &Agent::LARGEST => Color::NONE,
-            Cost::Traversable(radius) if *radius < Agent::Huge => Color::RED,
+            Cost::Traversable(radius) if *radius < Agent::Large => Color::RED,
             _ => Color::NONE,
             //.with_a(
             //     1.0 - ((*radius as u8 as f32 - Agent::SMALLEST as u8 as f32)

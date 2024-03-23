@@ -3,7 +3,7 @@ use crate::{
     app_state::AppState,
     navigation::{
         agent::Agent,
-        flow_field::{cache::FlowFieldCache, fields::flow::FlowField},
+        flow_field::{cache::FlowFieldCache, fields::flow::FlowField, layout::FieldBounds},
     },
     prelude::*,
 };
@@ -49,7 +49,7 @@ impl Plugin for FlowFieldPlugin {
             (
                 fields::obstacle::clear,
                 // Would like to put this into [`FlowFieldAgentPlugin`], but not sure how to ensure the order.
-                // The order is important, should be splatting from large to small.
+                // The order is important, should be 'splat' from largest to smallest.
                 fields::obstacle::splat::<{ Agent::Huge }>,
                 fields::obstacle::splat::<{ Agent::Large }>,
                 fields::obstacle::splat::<{ Agent::Medium }>,
@@ -65,9 +65,10 @@ pub struct FlowFieldAgentPlugin<const AGENT: Agent>;
 
 impl<const AGENT: Agent> Plugin for FlowFieldAgentPlugin<AGENT> {
     fn build(&self, app: &mut App) {
-        app_register_types!(FlowField<AGENT>, FlowFieldCache<AGENT>);
+        app_register_types!(FlowField<AGENT>, FlowFieldCache<AGENT>, FieldBounds::<AGENT>);
 
         app.insert_resource(FlowFieldCache::<AGENT>::default());
+        app.insert_resource(FieldBounds::<AGENT>::default());
 
         app.add_systems(
             FixedUpdate,
@@ -79,6 +80,7 @@ impl<const AGENT: Agent> Plugin for FlowFieldAgentPlugin<AGENT> {
             (
                 cache::tick::<AGENT>,
                 cache::despawn::<AGENT>,
+                layout::field_bounds::<AGENT>, //.run_if(resource_exists_and_changed::<FieldLayout>),
                 footprint::expand::<AGENT>.after(footprint::agents).after(footprint::obstacles),
             )
                 .in_set(FlowFieldSystems::Maintain),
