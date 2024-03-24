@@ -10,7 +10,7 @@ pub const EPSILON: f32 = 1.0 / 1024.0;
 
 pub fn clearpath_avoidance(
     mut agents: Query<(Entity, &Agent, &GlobalTransform, &DesiredVelocity, &mut AvoidanceVelocity, &LinearVelocity)>,
-    neighbors: Query<(&Agent, &GlobalTransform, &LinearVelocity)>,
+    neighbors: Query<(&Agent, &GlobalTransform, &DesiredVelocity)>,
     agents_kd_tree: Res<KDTree3<Agent>>,
 ) {
     agents.par_iter_mut().for_each(
