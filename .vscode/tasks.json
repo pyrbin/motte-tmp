@@ -4,16 +4,8 @@
     {
       "label": "📦 watch",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "watch",
-        "--features",
-        "debug",
-        "-q",
-        "-c",
-        "-x",
-        "'run -- --bin warband'",
-      ],
+      "command": "just",
+      "args": ["watch"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -22,14 +14,8 @@
     {
       "label": "🦀 run",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "run",
-        "--bin",
-        "warband",
-        "--features",
-        "debug",
-      ],
+      "command": "just",
+      "args": ["run"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -38,16 +24,8 @@
     {
       "label": "📟 run: wasm",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "run",
-        "--bin",
-        "warband",
-        "--target",
-        "wasm32-unknown-unknown",
-        "--features",
-        "debug",
-      ],
+      "command": "just",
+      "args": ["wasm"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -56,13 +34,8 @@
     {
       "label": "🚤 build: release",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "build",
-        "--release",
-        "--bin",
-        "warband",
-      ],
+      "command": "just",
+      "args": ["build"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -71,26 +44,18 @@
     {
       "label": "👷‍♀️ build: debug",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "build",
-        "--bin",
-        "warband",
-        "--release",
-        "--features",
-        "debug"
-      ],
+      "command": "just",
+      "args": ["build-debug"],
       "group": {
         "kind": "build",
         "isDefault": true
       }
     },
     {
-      "label": "✅ fix",
-      "dependsOn": [
-        "🖌️ fmt",
-        "📎 clippy"
-      ],
+      "label": "🪄 fix",
+      "type": "shell",
+      "command": "just",
+      "args": ["fix"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -99,12 +64,8 @@
     {
       "label": "🤖 ci",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "run",
-        "-p",
-        "ci"
-      ],
+      "command": "just",
+      "args": ["ci"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -113,12 +74,8 @@
     {
       "label": "🖌️ fmt",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "fmt",
-        "-v",
-        "--all"
-      ],
+      "command": "just",
+      "args": ["fmt"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -127,17 +84,8 @@
     {
       "label": "📎 clippy",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "clippy",
-        "--fix",
-        "--workspace",
-        "--all-features",
-        "--allow-dirty",
-        "--allow-no-vcs",
-        "--",
-        "--no-deps"
-      ],
+      "command": "just",
+      "args": ["clippy"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -146,10 +94,8 @@
     {
       "label": "🧽 clean",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "clean",
-      ],
+      "command": "just",
+      "args": ["clean"],
       "group": {
         "kind": "build",
         "isDefault": true

@@ -1,0 +1,29 @@
+[package]
+name = "motte"
+version = "0.1.0"
+authors = ["pyrbin <git@pyrbin>"]
+edition = "2021"
+build = "build.rs"
+
+[features]
+dev_tools = ["motte_lib/dev_tools"]
+
+[dependencies.bevy]
+workspace = true
+
+[dependencies]
+motte_lib = { path = "../motte_lib" }
+bevy_embedded_assets = "0.10.0"
+
+# keep the following in sync with Bevy's dependencies
+winit = { version = "0.29.11", default-features = false }
+image = { version = "0.25.0", default-features = false }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bevy_dylib = { version = "0.13.1" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "*"
+
+[build-dependencies]
+embed-resource = "2.4.0"

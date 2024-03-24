@@ -15,6 +15,7 @@ Cargo.lock
 
 # Added by cargo
 /target
+rustc-ice-*.txt
 
 # IntelliJ IDEA
 .idea/

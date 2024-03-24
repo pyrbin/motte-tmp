@@ -6,4 +6,12 @@ protocol = "sparse"
 
 [target.x86_64-pc-windows-msvc]
 linker = "rust-lld.exe"
-rustflags = ["-Zshare-generics=n", "-Zthreads=16"]
+rustflags = [
+    "-Zshare-generics=off", # (Nightly) Shoulde use -Zshare-generics=n, but feels unstable :shrug:.
+    "-Zthreads=0",          # (Nightly) Use improved multithreading with the recommended amount of threads.
+]
+
+# Following improves compile times, but reduces the amount of debug info to 'line number tables only'
+# In most cases the gains are negligible, but if you are on macos and have slow compile times you should see significant gains.
+[profile.dev]
+debug = 1

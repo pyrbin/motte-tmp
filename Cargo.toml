@@ -1,12 +1,12 @@
 [workspace]
 members = ["crates/*", "tools/*"]
-default-members = ["crates/warband", "crates/warband_lib"]
+default-members = ["crates/motte", "crates/motte_lib"]
 resolver = "2"
 
 # Bevy
 [workspace.dependencies.bevy]
 default-features = false
-version = "0.13.0"
+version = "0.13.1"
 
 # Lints
 [workspace.lints.rust]

@@ -1,0 +1,69 @@
+[package]
+name = "motte_lib"
+version = "0.1.0"
+authors = ["pyrbin <git@pyrbin>"]
+edition = "2021"
+
+[features]
+default = ["dev_tools"]
+dev_tools = [
+    "dep:bevy-inspector-egui",
+    "dep:iyes_perf_ui",
+    "dep:bevy_egui",
+    "bevy/bevy_gizmos", 
+    "bevy_xpbd_3d/debug-plugin",
+]
+
+[dependencies]
+bevy_xpbd_3d = { version = "0.4.2", default-features = true, features = ["simd"] }
+bevy_xpbd_3d_interp = "0.1.2"
+parry2d = { version = "0.13" }
+bevy_asset_loader = { version = "0.20", features = ["2d", "3d"]}
+bevy_common_assets = "0.10.0"
+bevy_spatial = { version = "0.8.0", features = ["kdtree"] }
+
+# internal
+motte_macros = { path = "../motte_macros" }
+
+# common
+bytemuck = "1.14.0"
+micromap = "0.0.15"
+smallvec = { version = "1.11.2", features = ["union"] }
+git-version = "0.3.9"
+const_format = "0.2.32"
+lazy_static = "1.4.0"
+derive_more = "0.99.17"
+rand = "0.8.5"
+thiserror = "1.0"
+itertools = "0.12.1"
+
+# debug
+bevy_egui = { version = "0.26.0", optional = true }
+bevy-inspector-egui = { version = "0.23.2", optional = true }
+iyes_perf_ui = { version =  "0.2.3", optional = true }
+
+[dependencies.bevy]
+workspace = true
+default-features = false
+features = [
+    "animation",
+    "bevy_asset",
+    "bevy_gilrs",
+    "bevy_scene",
+    "bevy_winit",
+    "bevy_core_pipeline",
+    "bevy_pbr",
+    "bevy_gltf",
+    "bevy_render",
+    "bevy_sprite",
+    "bevy_text",
+    "bevy_ui",
+    "multi-threaded",
+    "png",
+    "hdr",
+    "x11",
+    "bevy_gizmos",
+    "tonemapping_luts",
+    "default_font",
+]
+
