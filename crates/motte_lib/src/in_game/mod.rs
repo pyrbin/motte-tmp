@@ -11,6 +11,9 @@ use crate::{
     movement::motor::CharacterMotor,
     navigation::{
         agent::{Agent, Speed},
+        avoidance::{
+            Avoidance, AvoidanceVelocity, ContrainedTranslation, ExtrapolatedTranslation, PreConstraintTranslation,
+        },
         flow_field::{
             fields::obstacle::ObstacleField, footprint::Footprint, layout::FieldLayout, pathing::Goal, CellIndex,
         },
@@ -155,7 +158,7 @@ fn setup(
     const HALF_RADIUS: f32 = RADIUS / 2.0;
 
     for i in 0..10 {
-        let agent = Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
+        let agent = Agent::Medium; // Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
         let translation = random_point_in_square(30.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
         commands.spawn((
@@ -172,6 +175,12 @@ fn setup(
             agent,
             Speed::base(200.0),
             CellIndex::default(),
+            Avoidance::new(2.0),
+            InverseMass(1.0),
+            ExtrapolatedTranslation::default(),
+            PreConstraintTranslation::default(),
+            ContrainedTranslation::default(),
+            AvoidanceVelocity::default(),
             // Footprint::default(),
         ));
     }

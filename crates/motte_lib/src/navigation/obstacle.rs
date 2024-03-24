@@ -45,7 +45,7 @@ pub(super) fn obstacle(
     // TODO: we would need another solution to properly support varying agent heights, not a concern for now tho.
     let max_agent_height = 1.0;
 
-    let border_expansion = 0.0;
+    let border_expansion = 0.5;
 
     obstacles.par_iter_mut().for_each(|(mut obstacle, collider, aabb, global_transform)| {
         if aabb.min.y > max_agent_height || aabb.max.y < plane_height {
@@ -82,6 +82,7 @@ pub(super) fn obstacle(
             return;
         }
 
+        // TODO: compute the convex hull more efficiently. Or at least use "barry" or 'glam-native' solution
         let mut shape: SmallVec<[Vec2; 8]> = parry2d::transformation::convex_hull(&vertices)
             .iter()
             .map(|point| transform.transform_point(Vec3::new(point.x, 0.0, point.y)).xz())

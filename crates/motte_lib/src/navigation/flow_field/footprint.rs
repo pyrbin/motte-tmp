@@ -4,6 +4,7 @@ use super::{fields::Cell, layout::FieldLayout, CellIndex};
 use crate::{
     navigation::{agent::Agent, obstacle::Obstacle},
     prelude::*,
+    utils::math::point_in_poly2d,
 };
 
 /// Footprint of an entity on the field.
@@ -110,20 +111,13 @@ pub(super) fn obstacles(
         let min_cell = layout.cell(aabb.min.xz());
         let max_cell = layout.cell(aabb.max.xz());
 
-        // FIXME: annoying glam to nalgebra conversion
-        let shape = shape.iter().map(|v| OPoint::<f32, Const<2>>::from_slice(&[v.x, v.y])).collect::<Vec<_>>();
-
         *footprint = Footprint::Cells(
             (min_cell.x()..=max_cell.x())
                 .step_by(layout.cell_size() as usize)
                 .flat_map(|x| {
                     (min_cell.y()..=max_cell.y()).step_by(layout.cell_size() as usize).map(move |y| Cell::new(x, y))
                 })
-                .filter(|&cell| {
-                    let world_position = layout.position(cell);
-                    parry2d::utils::point_in_poly2d(&OPoint::from_slice(&[world_position.x, world_position.y]), &shape)
-                        && layout.index(cell).is_some()
-                })
+                .filter(|&cell| layout.index(cell).is_some() && point_in_poly2d(layout.position(cell), &shape))
                 .collect(),
         );
     });

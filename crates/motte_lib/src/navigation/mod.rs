@@ -6,6 +6,7 @@ use crate::{
     movement::MovementSystems,
     navigation::{
         agent::{agent_type, AgentType, DesiredVelocity, Seek, Speed, TargetDistance},
+        avoidance::AvoidancePlugin,
         flow_field::{FlowFieldAgentPlugin, FlowFieldPlugin, FlowFieldSystems},
         obstacle::Obstacle,
     },
@@ -16,6 +17,8 @@ use crate::{
 // TODO: Resource for RebuildFlows* RebuildObstacle* unsafe poke for when to trigger rebuild.
 
 pub mod agent;
+pub mod avoidance;
+pub mod clearpath;
 pub mod flow_field;
 pub mod obstacle;
 
@@ -23,6 +26,8 @@ pub mod obstacle;
 pub enum NavigationSystems {
     Setup,
     Maintain,
+    Seek,
+    Avoidance,
     ApplyVelocity,
     Cleanup,
 }
@@ -36,6 +41,7 @@ impl Plugin for NavigationPlugin {
         app.add_plugins(FlowFieldPlugin);
         app.add_plugins((AutomaticUpdate::<agent::Agent>::new(), AutomaticUpdate::<obstacle::Obstacle>::new()));
         app.add_plugins(StatPlugin::<Speed>::default());
+        app.add_plugins(AvoidancePlugin);
 
         app.add_plugins(AgentPlugin::<{ Agent::Small }>);
         app.add_plugins(AgentPlugin::<{ Agent::Medium }>);
@@ -47,8 +53,10 @@ impl Plugin for NavigationPlugin {
             (
                 NavigationSystems::Setup,
                 NavigationSystems::Maintain.before(FlowFieldSystems::Maintain),
+                NavigationSystems::Seek.after(FlowFieldSystems::Pathing),
+                NavigationSystems::Avoidance.after(FlowFieldSystems::Pathing),
                 NavigationSystems::ApplyVelocity.after(FlowFieldSystems::Pathing).before(MovementSystems::Motor),
-                (NavigationSystems::Cleanup).after(MovementSystems::State),
+                NavigationSystems::Cleanup.after(MovementSystems::State),
             )
                 .chain()
                 .before(PhysicsSet::Prepare)
@@ -59,8 +67,9 @@ impl Plugin for NavigationPlugin {
         app.add_systems(
             FixedUpdate,
             (
-                obstacle::obstacle.in_set(NavigationSystems::Maintain),
-                (agent::seek, agent::apply_velocity).chain().in_set(NavigationSystems::ApplyVelocity),
+                (obstacle::obstacle).in_set(NavigationSystems::Maintain),
+                (agent::seek).in_set(NavigationSystems::Seek),
+                (agent::apply_velocity).in_set(NavigationSystems::ApplyVelocity),
             ),
         );
         app.add_systems(FixedUpdate, (agent::target_reached).in_set(NavigationSystems::Cleanup));

@@ -212,3 +212,61 @@ impl<T: Default> Reset for T {
         *self = T::default();
     }
 }
+
+pub trait Zero: PartialEq + Sized {
+    const ZERO: Self;
+
+    fn is_zero(&self) -> bool {
+        *self == Self::ZERO
+    }
+}
+
+impl Zero for Vec3 {
+    const ZERO: Self = Self::ZERO;
+}
+
+impl Zero for f32 {
+    const ZERO: Self = 0.0;
+}
+
+// Base trait for types that can be wrapped in a [`NotZero`](struct.NotZero.html).
+//
+// Implementors must provide a singleton object that will be used to mark empty edges in a
+// [`MatrixGraph`](struct.MatrixGraph.html).
+//
+// Note that this trait is already implemented for the base numeric types.
+// pub trait Zero {
+// Return the singleton object which can be used as a sentinel value.
+// fn zero() -> Self;
+//
+// Return true if `self` is equal to the sentinel value.
+// fn is_zero(&self) -> bool;
+// }
+//
+// macro_rules! not_zero_impl {
+// ($t:ty,$z:expr) => {
+// impl Zero for $t {
+// fn zero() -> Self {
+// $z as $t
+// }
+//
+// #[allow(clippy::float_cmp)]
+// fn is_zero(&self) -> bool {
+// self == &Self::zero()
+// }
+// }
+// };
+// }
+//
+// macro_rules! not_zero_impls {
+// ($($t:ty),*) => {
+// $(
+// not_zero_impl!($t, 0);
+// )*
+// }
+// }
+//
+// not_zero_impls!(u8, u16, u32, u64, usize);
+// not_zero_impls!(i8, i16, i32, i64, isize);
+// not_zero_impls!(f32, f64);
+//

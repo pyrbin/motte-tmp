@@ -110,6 +110,7 @@ pub(super) fn seek(mut agents: Query<(Option<&Seek>, &Speed, &mut DesiredVelocit
 pub(super) fn apply_velocity(mut agents: Query<(&mut DesiredVelocity, &mut Movement), MovingAgents>) {
     agents.par_iter_mut().for_each(|(mut desired_velocity, mut movement)| {
         if desired_velocity.is_approx_zero() {
+            desired_velocity.reset();
             return;
         }
 
