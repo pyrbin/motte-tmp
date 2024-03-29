@@ -8,11 +8,14 @@ watch:
 run:
     cargo run --bin $bin --features dev_tools
 
-wasm:
+run-wasm:
     cargo run --bin $bin --target wasm32-unknown-unknown --features dev_tools
 
 build:
-    cargo build --release --bin $bin
+    cargo build --bin $bin --release
+
+build-wasm:
+    cargo build --bin $bin --profile wasm --target wasm32-unknown-unknown
 
 build-debug:
     cargo build --bin $bin --features dev_tools
@@ -25,8 +28,7 @@ fmt:
     cargo fmt -v --all
 
 clippy:
-    # TODO: remove "allow dead_code" when I care about that
-    cargo clippy --fix --workspace --all-features --allow-dirty --allow-no-vcs -- -A dead_code --no-deps
+    cargo clippy --fix --workspace --all-features --allow-dirty --allow-no-vcs -- --no-deps
 
 ci: 
     cargo run -p ci

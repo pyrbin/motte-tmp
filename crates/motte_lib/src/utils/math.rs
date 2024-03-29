@@ -37,7 +37,7 @@ pub fn random_point_in_square(size: f32) -> Vec2 {
 /// ref: https://github.com/Jondolf/barry/blob/main/src/utils/point_in_poly2d.rs
 #[inline]
 pub fn point_in_poly2d(pt: Vec2, poly: &[Vec2]) -> bool {
-    if poly.len() == 0 {
+    if poly.is_empty() {
         false
     } else {
         let mut sign = 0.0;

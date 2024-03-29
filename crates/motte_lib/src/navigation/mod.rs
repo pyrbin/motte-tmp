@@ -18,9 +18,11 @@ use crate::{
 
 pub mod agent;
 pub mod avoidance;
+pub mod boids;
 pub mod clearpath;
 pub mod flow_field;
 pub mod obstacle;
+pub mod sonar;
 
 #[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NavigationSystems {

@@ -14,6 +14,7 @@ use crate::{
         avoidance::{
             Avoidance, AvoidanceVelocity, ContrainedTranslation, ExtrapolatedTranslation, PreConstraintTranslation,
         },
+        boids::Boided,
         flow_field::{
             fields::obstacle::ObstacleField, footprint::Footprint, layout::FieldLayout, pathing::Goal, CellIndex,
         },
@@ -123,7 +124,7 @@ fn setup(
         ))
         .id();
 
-    for i in 0..10 {
+    for i in 0..0 {
         let translation = random_point_in_square(70.0);
         let radius = thread_rng().gen_range(2.0..3.0);
         let height = thread_rng().gen_range(2.0..6.0);
@@ -159,30 +160,39 @@ fn setup(
 
     for i in 0..10 {
         let agent = Agent::Medium; // Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
-        let translation = random_point_in_square(30.0);
+        let translation = random_point_in_square(20.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
-        commands.spawn((
-            Name::unit(format!("agent {i}")),
-            PbrBundle {
-                mesh: meshes.add(Mesh::from(Cylinder { radius: agent.radius(), half_height: agent.height() / 2.0 })),
-                material: materials.add(Color::GREEN.with_a(0.75)),
-                transform,
-                ..default()
-            },
-            Goal::Entity(target),
-            CharacterMotor::cylinder(RADIUS, HALF_RADIUS),
-            pixelate::Snap::translation(),
-            agent,
-            Speed::base(200.0),
-            CellIndex::default(),
-            Avoidance::new(2.0),
-            InverseMass(1.0),
-            ExtrapolatedTranslation::default(),
-            PreConstraintTranslation::default(),
-            ContrainedTranslation::default(),
-            AvoidanceVelocity::default(),
-            // Footprint::default(),
-        ));
+        let agent = commands
+            .spawn((
+                Name::unit(format!("agent {i}")),
+                PbrBundle {
+                    mesh: meshes
+                        .add(Mesh::from(Cylinder { radius: agent.radius(), half_height: agent.height() / 2.0 })),
+                    material: materials.add(Color::GREEN.with_a(0.75)),
+                    transform,
+                    ..default()
+                },
+                CharacterMotor::cylinder(agent.height(), agent.radius()),
+                pixelate::Snap::translation(),
+                agent,
+                Speed::base(100.0),
+                CellIndex::default(),
+                Avoidance::new(2.0),
+                InverseMass(1.0),
+                ExtrapolatedTranslation::default(),
+                PreConstraintTranslation::default(),
+                ContrainedTranslation::default(),
+                AvoidanceVelocity::default(),
+                bevy_mod_picking::PickableBundle::default(),
+                #[cfg(feature = "dev_tools")]
+                bevy_transform_gizmo::GizmoTransformable,
+                // Footprint::default(),
+            ))
+            .id();
+
+        if i == 0 {
+            commands.entity(agent).insert(Goal::Entity(target)).insert(Boided);
+        }
     }
 }
 

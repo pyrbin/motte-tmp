@@ -44,6 +44,8 @@ fn setup(mut commands: Commands, _asset_server: Res<AssetServer>) {
             pixelate::SnapTransforms::Off,
             pixelate::Snap::translation(),
             pixelate::SubPixelSmoothing::Off,
+            #[cfg(feature = "dev_tools")]
+            bevy_transform_gizmo::GizmoPickSource::default(),
         ))
         .id();
 

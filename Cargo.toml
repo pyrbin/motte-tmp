@@ -47,3 +47,8 @@ opt-level = 1
 [profile.release]
 codegen-units = 1
 lto = true
+
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+lto = "fat"

@@ -12,6 +12,7 @@ use super::{
 use crate::{
     app_state::AppState,
     navigation::{
+        boids::boid_avoidance,
         clearpath::{clearpath_avoidance, clearpath_integration},
         NavigationSystems,
     },
@@ -40,11 +41,16 @@ impl Plugin for AvoidancePlugin {
 
         app.add_systems(
             FixedUpdate,
-            (clearpath_avoidance, clearpath_integration)
-                .chain()
-                .in_set(NavigationSystems::Avoidance)
-                .run_if(in_state(AppState::InGame)),
+            (boid_avoidance).chain().in_set(NavigationSystems::Avoidance).run_if(in_state(AppState::InGame)),
         );
+
+        // app.add_systems(
+        //     FixedUpdate,
+        //     (clearpath_avoidance, clearpath_integration)
+        //         .chain()
+        //         .in_set(NavigationSystems::Avoidance)
+        //         .run_if(in_state(AppState::InGame)),
+        // );
     }
 }
 
@@ -155,14 +161,14 @@ pub(super) fn contact_solve(
                 dx = dx + w + d_tan;
             }
 
-            total_dx = total_dx + dx;
-            neighbor_count = neighbor_count + 1;
+            total_dx += dx;
+            neighbor_count += 1;
         }
 
         if neighbor_count > 0 {
             const AVG_COEFFICIENT: f32 = 1.2; // paper = 1.2 [1,2]
             let dx = AVG_COEFFICIENT * total_dx / neighbor_count as f32; // average displacement
-            **xp = **xp + dx; // update extrapolated position
+            **xp += dx; // update extrapolated position
         }
 
         // Obstacle Collisions
@@ -185,7 +191,7 @@ pub(super) fn contact_solve(
         if neighbor_count > 0 {
             const AVG_COEFFICIENT: f32 = 1.2; // paper = 1.2 [1,2]
             let dx = AVG_COEFFICIENT * total_dx / neighbor_count as f32; // average displacement
-            **xp = **xp + dx; // update extrapolated position
+            **xp += dx; // update extrapolated position
         }
     });
 }
@@ -255,7 +261,7 @@ pub(super) fn constraint_solve(
             let t = (b - discr) / a;
             const T0: f32 = 20.0;
             // Prune out invalid case
-            if t < f32::EPSILON || t > T0 {
+            if !(f32::EPSILON..=T0).contains(&t) {
                 continue;
             }
 
@@ -294,7 +300,7 @@ pub(super) fn constraint_solve(
                 // tangetial displacement
                 let d_tangent = d_vec - d_vec.dot(n) * n;
 
-                dx = dx + w * d_tangent;
+                dx += w * d_tangent;
 
                 total_dx += k * dx;
                 neighbor_count += 1;
@@ -304,7 +310,7 @@ pub(super) fn constraint_solve(
         if neighbor_count > 0 {
             const AVG_COEFFICIENT: f32 = 1.2; // paper = 1.2 [1,2]
             let dx = AVG_COEFFICIENT * total_dx / neighbor_count as f32; // average displacement
-            **xp = **xp + dx; // update extrapolated position
+            **xp += dx; // update extrapolated position
         }
 
         for (obstacle_entity, obstacle, obstacle_global_transform) in &obstacles {
@@ -326,7 +332,7 @@ pub(super) fn constraint_solve(
             const ITERATION: usize = 1;
             let k = 1.0 - (1.0 - K_OBSTACLE).powf(1.0 / (ITERATION + 1) as f32);
             let dx = AVG_COEFFICIENT * k * total_dx / neighbor_count as f32; // average displacement
-            **xp = **xp + dx; // update extrapolated position
+            **xp += dx; // update extrapolated position
         }
     });
 }
@@ -385,16 +391,16 @@ pub(super) fn finalize_velocity(
                     let n = (**xp + t_min * v) - obstacle_global_transform.translation();
                     const K_AVOID: f32 = 0.2;
                     let v_avoid = K_AVOID * n;
-                    new_v = new_v + v_avoid;
+                    new_v += v_avoid;
                 }
             }
 
             // Clamp
-            let v_dir = new_v.normalize_or_zero();
-            let max_speed = speed.value() * 1.2;
-            if new_v.length() > max_speed {
-                new_v = max_speed * v_dir;
-            }
+            // let v_dir = new_v.normalize_or_zero();
+            // let max_speed = speed.value() * 1.2;
+            // if new_v.length() > max_speed {
+            //     new_v = max_speed * v_dir;
+            // }
 
             **desired = new_v.xz();
         },
@@ -419,7 +425,7 @@ fn intersect_line(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2) -> Option<(Vec2, f32)>
         return Some((n, t));
     }
 
-    return None;
+    None
 }
 
 #[inline(always)]
@@ -447,5 +453,5 @@ fn wall_constraint(xp: Vec2, radius: f32, segment: (Vec2, Vec2)) -> Option<Vec3>
         return Some(dx.x0y());
     }
 
-    return None;
+    None
 }

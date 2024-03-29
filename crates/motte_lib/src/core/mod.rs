@@ -18,6 +18,7 @@ pub struct CorePlugin;
 impl Plugin for CorePlugin {
     fn build(&self, app: &mut App) {
         app_register_types!(Owner);
+        app.add_plugins(bevy_mod_picking::DefaultPickingPlugins);
         app.add_plugins((despawn::DespawnPlugin, cursor::CursorPlugin, camera::CameraPlugin::in_schedule(Last)));
         app.add_systems(OnEnter(AppState::InGame), cleanup::cleanup::<Cleanup<OnEnterState<{ AppState::InGame }>>>);
         app.add_systems(OnExit(AppState::InGame), cleanup::cleanup::<Cleanup<OnExitState<{ AppState::InGame }>>>);

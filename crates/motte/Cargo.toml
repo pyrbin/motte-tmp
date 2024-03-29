@@ -13,10 +13,10 @@ workspace = true
 
 [dependencies]
 motte_lib = { path = "../motte_lib" }
-bevy_embedded_assets = "0.10.0"
+bevy_embedded_assets = "0.10.2"
 
 # keep the following in sync with Bevy's dependencies
-winit = { version = "0.29.11", default-features = false }
+winit = { version = "0.29.15", default-features = false }
 image = { version = "0.25.0", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -26,4 +26,4 @@ bevy_dylib = { version = "0.13.1" }
 console_error_panic_hook = "*"
 
 [build-dependencies]
-embed-resource = "2.4.0"
+embed-resource = "2.4.2"

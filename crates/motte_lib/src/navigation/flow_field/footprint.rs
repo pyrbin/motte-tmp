@@ -1,5 +1,3 @@
-use bevy_xpbd_3d::parry::na::{Const, OPoint};
-
 use super::{fields::Cell, layout::FieldLayout, CellIndex};
 use crate::{
     navigation::{agent::Agent, obstacle::Obstacle},
@@ -117,7 +115,7 @@ pub(super) fn obstacles(
                 .flat_map(|x| {
                     (min_cell.y()..=max_cell.y()).step_by(layout.cell_size() as usize).map(move |y| Cell::new(x, y))
                 })
-                .filter(|&cell| layout.index(cell).is_some() && point_in_poly2d(layout.position(cell), &shape))
+                .filter(|&cell| layout.index(cell).is_some() && point_in_poly2d(layout.position(cell), shape))
                 .collect(),
         );
     });

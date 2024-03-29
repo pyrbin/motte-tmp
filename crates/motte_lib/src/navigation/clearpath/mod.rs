@@ -2,7 +2,7 @@ use bevy_spatial::{kdtree::KDTree3, SpatialAccess};
 
 use super::{
     agent::{Agent, DesiredVelocity, Speed},
-    avoidance::{self, AvoidanceVelocity},
+    avoidance::AvoidanceVelocity,
 };
 use crate::{prelude::*, utils::math::determinant};
 
@@ -23,7 +23,7 @@ pub fn clearpath_avoidance(
                 .filter_map(|(_, other)| {
                     other.filter(|&other| other != entity).and_then(|other| neighbors.get(other).ok())
                 })
-                .map(|n| (*n.0, n.1.translation().xz(), n.2.xz()))
+                .map(|n| (*n.0, n.1.translation().xz(), **n.2))
                 .collect::<Vec<_>>();
 
             if neighbors.is_empty() {
@@ -244,20 +244,12 @@ fn point_inside_pcr(point: Vec2, lines: &[Line]) -> bool {
 
 #[inline]
 fn ray_ray_intersection_2d(l1: &Line, l2: &Line) -> Option<Vec2> {
-    if let Some(intersect) = line_intersection(l1, l2) {
-        // Check if the intersection is forward along both rays' directions
-        if (intersect.x - l1.point.x) / l1.direction.x < 0.0
+    line_intersection(l1, l2).filter(|&intersect| {
+        !((intersect.x - l1.point.x) / l1.direction.x < 0.0
             || (intersect.y - l1.point.y) / l1.direction.y < 0.0
             || (intersect.x - l2.point.x) / l2.direction.x < 0.0
-            || (intersect.y - l2.point.y) / l2.direction.y < 0.0
-        {
-            None
-        } else {
-            Some(intersect) // Intersection is within ray bounds
-        }
-    } else {
-        None // No intersection
-    }
+            || (intersect.y - l2.point.y) / l2.direction.y < 0.0)
+    })
 }
 
 #[inline]

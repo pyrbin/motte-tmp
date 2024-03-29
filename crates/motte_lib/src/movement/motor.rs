@@ -14,19 +14,14 @@ impl CharacterMotor {
             movement: default(),
             jump: default(),
             collider,
-            rigid_body: RigidBody::Dynamic,
+            rigid_body: RigidBody::Kinematic,
             locked_axes: LockedAxes::ROTATION_LOCKED,
             damping: DampingFactor(0.9),
             max_slope_angle: MaxSlopeAngle(PI * 0.45),
             ground_caster: ShapeCaster::new(caster_shape, Vector::ZERO, Quaternion::default(), Direction3d::NEG_Y),
             collision_layers: CollisionLayers::new(
                 [CollisionLayer::Units],
-                [
-                    CollisionLayer::Player,
-                    // CollisionLayer::Units,
-                    CollisionLayer::Terrain,
-                    CollisionLayer::Sensor,
-                ],
+                [CollisionLayer::Player, CollisionLayer::Units, CollisionLayer::Terrain, CollisionLayer::Sensor],
             ),
             character_motor: default(),
         }

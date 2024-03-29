@@ -30,7 +30,9 @@ impl Plugin for DevToolsPlugin {
         if !app.is_plugin_added::<EguiPlugin>() {
             app.add_plugins(EguiPlugin);
         }
-        app.add_plugins(PhysicsDebugPlugin::default());
+
+        app.add_plugins((PhysicsDebugPlugin::default(), bevy_transform_gizmo::TransformGizmoPlugin::default()));
+
         app.add_plugins((perf_ui::PerfUiPlugin, side_panel::SidePanelPlugin));
 
         app.insert_gizmo_group(PhysicsGizmos { aabb_color: Some(Color::WHITE), ..default() }, GizmoConfig::default());
@@ -85,9 +87,9 @@ impl Default for DebugLayers {
     fn default() -> Self {
         Self {
             debug_cell_index: false,
-            debug_agents: false,
-            debug_obstacles: false,
-            debug_footprints: false,
+            debug_agents: true,
+            debug_obstacles: true,
+            debug_footprints: true,
             debug_obstacle_field: AgentDebugLayer::Disabled,
             debug_flow_field: AgentDebugLayer::Disabled,
             debug_field_layout: false,
