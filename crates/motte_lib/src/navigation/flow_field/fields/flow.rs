@@ -125,9 +125,11 @@ impl<const AGENT: Agent> FlowField<AGENT> {
         let width = integration.width();
         for i in 0..integration.len() {
             let cell = Cell::from_index(i, width);
+            let cost = integration[i];
             if let Some(min) = integration
                 .adjacent(cell)
                 .chain(integration.diagonal(cell).filter(|&n| is_diagonal_move_traversable(cell, cell.direction(n))))
+                .filter(|&n| cost.valid_flow_candidate(integration[n]))
                 .min_by(|a, b| integration[*a].cmp(&integration[*b]))
             {
                 flow[cell] = cell.direction(min);
@@ -233,6 +235,17 @@ impl IntegrationCost {
                 }
             }
             Traversable(_) => true,
+            Goal => true,
+        }
+    }
+
+    #[inline]
+    pub const fn valid_flow_candidate(&self, neighbor: IntegrationCost) -> bool {
+        use IntegrationCost::*;
+        match self {
+            Blocked(_, _) => true,
+            Occupied(_, _) => !matches!(neighbor, Blocked(_, _)),
+            Traversable(_) => matches!(neighbor, Traversable(_) | Goal),
             Goal => true,
         }
     }

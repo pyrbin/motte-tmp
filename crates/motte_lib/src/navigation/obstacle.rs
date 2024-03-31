@@ -98,7 +98,7 @@ pub(super) fn obstacle(
             polygon = polygon.scaled(&[BORDER_EXPANSION; 2].into()).unwrap();
         }
 
-        *obstacle = Obstacle::Shape(polygon.points().into_iter().map(|p| Vec2::new(p.x, p.y)).collect());
+        *obstacle = Obstacle::Shape(polygon.points().iter().map(|p| Vec2::new(p.x, p.y)).collect());
     });
 }
 

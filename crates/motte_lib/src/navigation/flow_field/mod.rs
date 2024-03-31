@@ -26,6 +26,7 @@ pub mod pathing;
 pub enum FlowFieldSystems {
     Setup,
     Maintain,
+    DetectChanges,
     Splat,
     Build,
     Pathing,
@@ -43,6 +44,7 @@ impl Plugin for FlowFieldPlugin {
             (
                 FlowFieldSystems::Setup,
                 FlowFieldSystems::Maintain,
+                FlowFieldSystems::DetectChanges,
                 FlowFieldSystems::Splat.run_if(on_event::<DirtyObstacleField>()),
                 FlowFieldSystems::Build,
                 FlowFieldSystems::Pathing,
@@ -56,9 +58,12 @@ impl Plugin for FlowFieldPlugin {
 
         app.add_systems(
             FixedUpdate,
-            (cell_index, (footprint::agents, footprint::obstacles), fields::obstacle::changes)
-                .chain()
-                .in_set(FlowFieldSystems::Maintain),
+            (cell_index, (footprint::agents, footprint::obstacles)).chain().in_set(FlowFieldSystems::Maintain),
+        );
+
+        app.add_systems(
+            FixedUpdate,
+            (apply_deferred, fields::obstacle::changes).chain().in_set(FlowFieldSystems::DetectChanges),
         );
 
         app.add_systems(
@@ -96,7 +101,7 @@ impl<const AGENT: Agent> Plugin for FlowFieldAgentPlugin<AGENT> {
             (
                 cache::tick::<AGENT>,
                 cache::despawn::<AGENT>,
-                layout::field_bounds::<AGENT>, //.run_if(resource_exists_and_changed::<FieldLayout>),
+                layout::field_bounds::<AGENT>,
                 footprint::expand::<AGENT>.after(footprint::agents).after(footprint::obstacles),
             )
                 .in_set(FlowFieldSystems::Maintain),

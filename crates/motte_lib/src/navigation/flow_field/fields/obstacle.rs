@@ -1,11 +1,10 @@
 use crate::{
     navigation::{
-        agent::{Agent, Blocking, TargetReached},
+        agent::{Agent, Blocking},
         flow_field::{
             fields::{Cell, Field},
             footprint::{ExpandedFootprint, Footprint},
             layout::{FieldBounds, FieldLayout},
-            pathing::Goal,
         },
         obstacle::Obstacle,
     },
@@ -111,7 +110,7 @@ pub(in crate::navigation) fn splat<const AGENT: Agent>(
     for (expanded_footprint, is_agent) in &obstacles {
         if let ExpandedFootprint::Cells(cells) = expanded_footprint {
             obstacle_field.splat(
-                &cells,
+                cells,
                 expanded_traversable(AGENT),
                 if is_agent { Occupant::Agent } else { Occupant::Obstacle },
             );
@@ -131,16 +130,16 @@ const fn expanded_traversable(agent: Agent) -> Cost {
     }
 }
 
-pub type ObstacleFilterChanged = (ObstacleFilter, Changed<Footprint>);
+pub type ObstacleFilterChanged = (ObstacleFilter, Or<(Changed<Footprint>, Added<Footprint>)>);
 
 pub(in crate::navigation) fn changes(
     obstacles: Query<Entity, ObstacleFilterChanged>,
     mut event: EventWriter<DirtyObstacleField>,
+    removed: RemovedComponents<Footprint>,
 ) {
-    if obstacles.is_empty() {
-        return;
+    if !obstacles.is_empty() || !removed.is_empty() {
+        event.send(DirtyObstacleField);
     }
-    event.send(DirtyObstacleField);
 }
 
 #[cfg(feature = "dev_tools")]

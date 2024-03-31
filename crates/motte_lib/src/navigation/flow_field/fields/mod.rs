@@ -417,7 +417,7 @@ impl<T> Field<T> {
     {
         self.width = width;
         self.height = height;
-        self.data.resize(self.len() as usize, T::default());
+        self.data.resize(self.len(), T::default());
     }
 }
 

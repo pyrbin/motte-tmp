@@ -22,8 +22,6 @@ impl Default for FieldLayout {
 
 impl FieldLayout {
     pub const fn new(width: fields::Scalar, height: fields::Scalar) -> Self {
-        debug_assert!(width <= fields::Scalar::MAX && height <= fields::Scalar::MAX);
-
         let mut layout = Self { width, height, ..Default::default() };
         layout.offset = centered_offset(layout.width, layout.height);
         layout
@@ -112,8 +110,10 @@ impl FieldLayout {
 pub struct FieldBounds<const AGENT: Agent>(Vec<Cell>);
 
 pub(super) fn field_bounds<const AGENT: Agent>(layout: Res<FieldLayout>, mut field_bounds: ResMut<FieldBounds<AGENT>>) {
-    let bounds = Agent::ALL.iter().filter(|a| a.radius() <= AGENT.radius()).flat_map(|a| layout.bounds(*a));
-    **field_bounds = bounds.collect();
+    if layout.is_changed() || layout.len() != 0 && field_bounds.0.is_empty() {
+        let bounds = Agent::ALL.iter().filter(|a| a.radius() <= AGENT.radius()).flat_map(|a| layout.bounds(*a));
+        **field_bounds = bounds.collect();
+    }
 }
 
 #[inline]

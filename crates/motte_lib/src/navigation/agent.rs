@@ -28,6 +28,15 @@ impl Agent {
         self.size() / 2.0
     }
 
+    pub const fn radius_sqrt(&self) -> f32 {
+        use parry2d::na::SimdComplexField;
+        self.radius().simd_powi(2)
+    }
+
+    pub const fn neighborhood(&self) -> f32 {
+        self.radius() + Agent::LARGEST.radius()
+    }
+
     pub const fn size(self) -> f32 {
         self as u8 as f32
     }
@@ -103,7 +112,9 @@ pub(super) fn desired_velocity(
         if let Some(desired_direction) = desired_direction
             && let Some(dir) = **desired_direction
         {
-            **desired_velocity = dir.xy() * **speed;
+            const KSI: f32 = 0.0385;
+            const MAGNITUDE: f32 = 100.0;
+            **desired_velocity = ((1.0 - KSI) * **desired_velocity + KSI * (dir.xy() * **speed)) * MAGNITUDE;
         }
     });
 }
@@ -144,10 +155,13 @@ pub(super) fn target_reached(
 
 pub(super) fn blocking(
     commands: ParallelCommands,
-    idle: Query<Entity, (With<Agent>, Or<(Without<Goal>, With<TargetReached>)>, Without<Blocking>)>,
-    pathing: Query<Entity, (With<Agent>, With<Goal>, Without<TargetReached>, With<Blocking>)>,
+    blocking: Query<
+        Entity,
+        (With<Agent>, Or<(Without<Goal>, With<TargetReached>)>, Or<(Without<Blocking>, Without<Footprint>)>),
+    >,
+    pathing: Query<Entity, (With<Agent>, With<Goal>, Without<TargetReached>, Or<(With<Blocking>, With<Footprint>)>)>,
 ) {
-    idle.par_iter().for_each(|entity| {
+    blocking.par_iter().for_each(|entity| {
         commands.command_scope(|mut c| {
             c.entity(entity).insert((Footprint::default(), Blocking));
         });

@@ -68,19 +68,19 @@ pub(super) fn agents(
         }
         CellIndex::Valid(center, _) => {
             let layout = *layout;
-            let border_radius = HALF_CELL_SIZE / 2.0;
+            const BORDER_PADDING: f32 = HALF_CELL_SIZE;
 
             let agent_radius: f32 = agent.radius();
             let agent_radius_sqrt = agent_radius * agent_radius;
             let agent_position = global_transform.translation().xz();
 
             let min_cell = layout.cell(Vec2::new(
-                agent_position.x - (agent_radius + border_radius),
-                agent_position.y - (agent_radius + border_radius),
+                agent_position.x - (agent_radius + BORDER_PADDING),
+                agent_position.y - (agent_radius + BORDER_PADDING),
             ));
             let max_cell = layout.cell(Vec2::new(
-                agent_position.x + (agent_radius + border_radius),
-                agent_position.y + (agent_radius + border_radius),
+                agent_position.x + (agent_radius + BORDER_PADDING),
+                agent_position.y + (agent_radius + BORDER_PADDING),
             ));
 
             *footprint = Footprint::Cells(
@@ -149,12 +149,15 @@ pub(super) fn setup<const AGENT: Agent>(
 }
 
 pub(super) fn expand<const AGENT: Agent>(
-    mut footprints: Query<(&Footprint, &mut ExpandedFootprint<AGENT>), Changed<Footprint>>,
+    mut footprints: Query<
+        (&Footprint, &mut ExpandedFootprint<AGENT>),
+        Or<(Changed<Footprint>, Added<Footprint>, Added<ExpandedFootprint<AGENT>>)>,
+    >,
 ) {
     let expansion = AGENT.radius().floor() as u32;
 
     footprints.par_iter_mut().for_each(|(footprint, mut expanded_footprint)| {
-        if expansion <= 0 {
+        if expansion == 0 {
             let Footprint::Cells(cells) = footprint else {
                 *expanded_footprint = ExpandedFootprint::Empty;
                 return;

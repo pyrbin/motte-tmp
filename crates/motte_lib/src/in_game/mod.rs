@@ -11,10 +11,6 @@ use crate::{
     movement::motor::CharacterMotor,
     navigation::{
         agent::{Agent, Speed, TargetReachedCondition},
-        avoidance::{
-            Avoidance, AvoidanceVelocity, ContrainedTranslation, ExtrapolatedTranslation, PreConstraintTranslation,
-        },
-        boids::Boided,
         flow_field::{
             fields::obstacle::ObstacleField, footprint::Footprint, layout::FieldLayout, pathing::Goal, CellIndex,
         },
@@ -33,6 +29,7 @@ impl Plugin for InGamePlugin {
         app.add_systems(Update, click);
 
         const DEFAULT_SIZE: (u8, u8) = (16 * 8, 9 * 8);
+
         let layout = FieldLayout::new(DEFAULT_SIZE.0, DEFAULT_SIZE.1);
         let obstacles = ObstacleField::from_layout(&layout);
 
@@ -154,9 +151,9 @@ fn setup(
         ));
     }
 
-    for i in 0..15 {
-        let agent = Agent::Medium; // Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
-        let translation = random_point_in_square(20.0);
+    for i in 0..30 {
+        let agent = Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
+        let translation = random_point_in_square(50.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
         let agent = commands
             .spawn((
@@ -173,21 +170,12 @@ fn setup(
                 agent,
                 Speed::base(100.0),
                 CellIndex::default(),
-                Avoidance::new(2.0),
-                InverseMass(11111.0),
-                ExtrapolatedTranslation::default(),
-                PreConstraintTranslation::default(),
-                ContrainedTranslation::default(),
                 TargetReachedCondition::Distance(1.0),
-                // bevy_mod_picking::PickableBundle::default(),
-                // #[cfg(feature = "dev_tools")]
-                // bevy_transform_gizmo::GizmoTransformable,
             ))
             .id();
 
         if i % 2 == 0 {
-            commands.entity(agent).insert(Goal::Entity(target)).insert(Boided::default());
-        } else {
+            commands.entity(agent).insert(Goal::Entity(target));
         }
     }
 }

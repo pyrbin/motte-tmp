@@ -48,6 +48,7 @@ impl Plugin for DevToolsPlugin {
                 crate::navigation::flow_field::gizmos_cell_index.run_if(|d: Res<DebugLayers>| d.debug_cell_index),
                 crate::navigation::agent::gizmos.run_if(|d: Res<DebugLayers>| d.debug_agents),
                 crate::navigation::obstacle::gizmos.run_if(|d: Res<DebugLayers>| d.debug_obstacles),
+                crate::navigation::avoidance::gizmos.run_if(|d: Res<DebugLayers>| d.debug_avoidance),
                 // TODO: annoying setup, maybe use a macro to generate this :P ?
                 crate::navigation::flow_field::fields::obstacle::gizmos::<{ Agent::Huge }>
                     .run_if(|d: Res<DebugLayers>| d.debug_obstacle_field.enabled_for(Agent::Huge)),
@@ -76,6 +77,7 @@ pub struct DebugLayers {
     debug_cell_index: bool,
     debug_agents: bool,
     debug_obstacles: bool,
+    debug_avoidance: bool,
     debug_footprints: bool,
     debug_obstacle_field: AgentDebugLayer,
     debug_flow_field: AgentDebugLayer,
@@ -88,6 +90,7 @@ impl Default for DebugLayers {
         Self {
             debug_cell_index: true,
             debug_agents: true,
+            debug_avoidance: true,
             debug_obstacles: true,
             debug_footprints: true,
             debug_obstacle_field: AgentDebugLayer::Medium,

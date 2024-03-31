@@ -6,7 +6,6 @@ use crate::{
     movement::MovementSystems,
     navigation::{
         agent::{agent_type, AgentType, Blocking, DesiredDirection, DesiredVelocity, Speed, TargetDistance},
-        avoidance::AvoidancePlugin,
         flow_field::{FlowFieldAgentPlugin, FlowFieldPlugin, FlowFieldSystems},
         obstacle::Obstacle,
     },
@@ -16,12 +15,8 @@ use crate::{
 
 pub mod agent;
 pub mod avoidance;
-pub mod boids;
-pub mod clearpath;
-pub mod dodgy;
 pub mod flow_field;
 pub mod obstacle;
-pub mod sonar;
 
 #[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NavigationSystems {
@@ -42,7 +37,6 @@ impl Plugin for NavigationPlugin {
         app.add_plugins(FlowFieldPlugin);
         app.add_plugins((AutomaticUpdate::<agent::Agent>::new(), AutomaticUpdate::<obstacle::Obstacle>::new()));
         app.add_plugins(StatPlugin::<Speed>::default());
-        app.add_plugins(AvoidancePlugin);
 
         app.add_plugins(AgentPlugin::<{ Agent::Small }>);
         app.add_plugins(AgentPlugin::<{ Agent::Medium }>);
@@ -64,16 +58,17 @@ impl Plugin for NavigationPlugin {
                 .run_if(in_state(AppState::InGame)),
         );
 
-        app.add_systems(FixedUpdate, (agent::setup).in_set(NavigationSystems::Setup));
+        app.add_systems(FixedUpdate, (agent::setup, avoidance::setup).in_set(NavigationSystems::Setup));
         app.add_systems(
             FixedUpdate,
             (
-                (obstacle::obstacle, agent::blocking).in_set(NavigationSystems::Maintain),
+                (obstacle::obstacle, agent::blocking, avoidance::sync).in_set(NavigationSystems::Maintain),
+                (avoidance::dodgy).in_set(NavigationSystems::Avoidance),
                 (agent::desired_velocity).in_set(NavigationSystems::Velocity),
                 (agent::apply_velocity).in_set(NavigationSystems::ApplyVelocity),
             ),
         );
-        app.add_systems(FixedUpdate, (agent::target_reached).in_set(NavigationSystems::Cleanup));
+        app.add_systems(FixedUpdate, (agent::target_reached, avoidance::cleanup).in_set(NavigationSystems::Cleanup));
     }
 }
 
