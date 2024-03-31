@@ -1,6 +1,6 @@
 use crate::{
     navigation::{
-        agent::{Agent, TargetReached},
+        agent::{Agent, Blocking, TargetReached},
         flow_field::{
             fields::{Cell, Field},
             footprint::{ExpandedFootprint, Footprint},
@@ -94,7 +94,7 @@ impl Cost {
 #[derive(Event, Reflect)]
 pub struct DirtyObstacleField;
 
-pub type ObstacleFilter = Or<(With<Obstacle>, (With<Agent>, Without<Goal>), (With<Agent>, With<TargetReached>))>;
+pub type ObstacleFilter = Or<((With<Obstacle>, With<Footprint>), (With<Agent>, With<Blocking>, With<Footprint>))>;
 
 #[inline]
 pub(in crate::navigation) fn clear(mut obstacle_field: ResMut<ObstacleField>) {
@@ -134,7 +134,7 @@ const fn expanded_traversable(agent: Agent) -> Cost {
 pub type ObstacleFilterChanged = (ObstacleFilter, Changed<Footprint>);
 
 pub(in crate::navigation) fn changes(
-    obstacles: Query<Entity, Changed<Footprint>>,
+    obstacles: Query<Entity, ObstacleFilterChanged>,
     mut event: EventWriter<DirtyObstacleField>,
 ) {
     if obstacles.is_empty() {

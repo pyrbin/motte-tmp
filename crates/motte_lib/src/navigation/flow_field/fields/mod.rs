@@ -9,19 +9,25 @@ use crate::prelude::*;
 pub type Scalar = u8;
 
 /// The signed scalar type used for coordinates.
-pub type SignedScalar = i32;
+pub type SignedScalar = i16;
 
 /// (X, Y) coordinates in a field.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Hash, Deref, DerefMut, From, Reflect)]
 pub struct Cell((Scalar, Scalar));
 
-#[inline]
 /// Instantiates a new [Cell] from coordinates.
+#[inline]
 pub const fn cell(x: Scalar, y: Scalar) -> Cell {
     Cell::new(x, y)
 }
 
 impl Cell {
+    /// The scalar type used for coordinates.
+    pub type Scalar = Scalar;
+
+    /// The signed scalar type used for coordinates.
+    pub type SignedScalar = SignedScalar;
+
     /// (0, 0)
     pub const ZERO: Self = Self::new(0, 0);
 
@@ -136,6 +142,7 @@ impl Cell {
         self.x().abs_diff(rhs.x()).max(self.y().abs_diff(rhs.y())) as u32
     }
 
+    /// Returns the [Direction] from `self` to `other`.
     #[inline]
     pub const fn direction(&self, other: Cell) -> Direction {
         let dx = other.x() as i32 - self.x() as i32;

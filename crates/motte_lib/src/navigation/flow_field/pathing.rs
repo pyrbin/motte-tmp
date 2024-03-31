@@ -6,7 +6,7 @@ use super::{
     CellIndex,
 };
 use crate::{
-    navigation::agent::{Agent, AgentType, Seek, TargetDistance},
+    navigation::agent::{Agent, AgentType, DesiredDirection, TargetDistance},
     prelude::*,
 };
 
@@ -19,22 +19,22 @@ pub enum Goal {
     Cell(Cell),
 }
 
-pub(super) fn seek<const AGENT: Agent>(
-    mut agents: Query<(Entity, &Goal, &mut Seek, &mut TargetDistance, &CellIndex), With<AgentType<AGENT>>>,
+pub(super) fn direction<const AGENT: Agent>(
+    mut agents: Query<(Entity, &Goal, &mut DesiredDirection, &mut TargetDistance, &CellIndex), With<AgentType<AGENT>>>,
     layout: Res<FieldLayout>,
     flow_field_cache: Res<FlowFieldCache<AGENT>>,
     flow_fields: Query<(&FlowField<AGENT>, Option<Ref<Footprint>>), Without<Disabled<FlowField<AGENT>>>>,
     transforms: Query<Ref<GlobalTransform>>,
 ) {
-    agents.par_iter_mut().for_each(|(entity, goal, mut seek, mut target_distance, cell_index)| {
+    agents.par_iter_mut().for_each(|(entity, goal, mut desired_direction, mut target_distance, cell_index)| {
         if matches!(goal, Goal::None) {
-            *seek = Seek(None);
+            *desired_direction = DesiredDirection(None);
             **target_distance = 0.0;
             return;
         }
 
         let CellIndex::Valid(cell, index) = cell_index else {
-            *seek = Seek(None);
+            *desired_direction = DesiredDirection(None);
             **target_distance = 0.0;
             return;
         };
@@ -42,7 +42,7 @@ pub(super) fn seek<const AGENT: Agent>(
         let entry = flow_field_cache.get(goal);
 
         if entry.is_none() {
-            *seek = Seek(None);
+            *desired_direction = DesiredDirection(None);
             **target_distance = 0.0;
             return;
         }
@@ -66,20 +66,20 @@ pub(super) fn seek<const AGENT: Agent>(
         let (flow_field, footprint) = flow_fields.get(entry.0).unwrap();
 
         if flow_field.is_empty() {
-            *seek = Seek(None);
+            *desired_direction = DesiredDirection(None);
             **target_distance = 0.0;
             return;
         }
 
         if !flow_field.valid(*cell) {
-            *seek = Seek(None);
+            *desired_direction = DesiredDirection(None);
             **target_distance = 0.0;
             return;
         }
 
         // direction
         let direction = flow_field[*index];
-        *seek = Seek(direction.as_direction2d());
+        *desired_direction = DesiredDirection(direction.as_direction2d());
 
         // distance
         let transform = transforms.get(entity).unwrap();

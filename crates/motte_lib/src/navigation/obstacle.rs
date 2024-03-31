@@ -4,6 +4,7 @@ use bevy_xpbd_3d::parry::{
 };
 use parry2d::shape::ConvexPolygon;
 
+use super::flow_field::CellIndex;
 use crate::{navigation::agent::Agent, prelude::*};
 
 #[derive(Component, Clone, Default, Reflect)]
@@ -38,7 +39,7 @@ impl Obstacle {
 pub(super) fn obstacle(
     mut obstacles: Query<
         (&mut Obstacle, &Collider, &ColliderAabb, &GlobalTransform),
-        Or<(Changed<GlobalTransform>, Changed<Collider>, Changed<ColliderAabb>)>,
+        Or<(Changed<CellIndex>, Changed<Collider>, Changed<ColliderAabb>, Added<Obstacle>)>,
     >,
 ) {
     // TODO: sample height if/whenever we have a generated height-field.

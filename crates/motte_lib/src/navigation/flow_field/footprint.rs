@@ -54,7 +54,10 @@ impl Footprint {
 }
 
 pub(super) fn agents(
-    mut agents: Query<(&mut Footprint, &Agent, &CellIndex, &GlobalTransform), Changed<CellIndex>>,
+    mut agents: Query<
+        (&mut Footprint, &Agent, &CellIndex, &GlobalTransform),
+        Or<(Changed<CellIndex>, Added<Footprint>)>,
+    >,
     layout: Res<FieldLayout>,
 ) {
     agents.par_iter_mut().for_each(|(mut footprint, agent, cell_index, global_transform)| match cell_index {

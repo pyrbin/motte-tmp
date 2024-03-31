@@ -110,7 +110,7 @@ impl<const AGENT: Agent> Plugin for FlowFieldAgentPlugin<AGENT> {
                 ),
                 apply_deferred,
                 fields::flow::build::<AGENT>.in_set(FlowFieldSystems::Build),
-                pathing::seek::<AGENT>.in_set(FlowFieldSystems::Pathing),
+                pathing::direction::<AGENT>.in_set(FlowFieldSystems::Pathing),
             )
                 .chain(),
         );

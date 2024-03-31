@@ -53,6 +53,7 @@ impl<const AGENT: Agent> FlowField<AGENT> {
         }
 
         heap.clear();
+
         for goal in goals.into_iter() {
             if !flow.valid(goal) {
                 continue;
@@ -121,7 +122,6 @@ impl<const AGENT: Agent> FlowField<AGENT> {
             }
         }
 
-        // kernel
         let width = integration.width();
         for i in 0..integration.len() {
             let cell = Cell::from_index(i, width);
@@ -133,33 +133,6 @@ impl<const AGENT: Agent> FlowField<AGENT> {
                 flow[cell] = cell.direction(min);
             }
         }
-
-        // // obstacles
-        // for (origin, footprint) in obstacles {
-        //     for &cell in footprint {
-        //         if !flow.valid(cell) || flow[cell] != Direction::None {
-        //             continue;
-        //         }
-        //         if integration[cell] == IntegrationCost::Goal {
-        //             flow[cell] = Direction::from_vec(origin.as_vec2() - cell.as_vec2());
-        //             continue;
-        //         }
-        //         // TODO: we could do 2 passes here, first build a potential field from obstacle center, then flow
-        //         let min = integration
-        //             .neighbors(cell)
-        //             .min_by(|&a, &b| integration[a].cost().cmp(&integration[b].cost()))
-        //             .unwrap();
-
-        //         flow[cell] = cell.direction(min);
-        //     }
-        // }
-
-        // // field bounds
-        // let center = flow.center();
-        // for &cell in bounds {
-        //     let direction = (center.as_vec2() - cell.as_vec2()).normalize_or_zero();
-        //     flow[cell] = Direction::from_vec(direction);
-        // }
     }
 }
 
@@ -296,23 +269,18 @@ impl Ord for IntegrationCost {
             (Blocked(a1, a2), Blocked(b1, b2)) | (Occupied(a1, a2), Occupied(b1, b2)) => {
                 a1.cmp(b1).then_with(|| a2.cmp(b2))
             }
-
             // When one is Blocked/Occupied, and the other is also Blocked/Occupied but different variants
             (Blocked(_, _), Occupied(_, _)) => std::cmp::Ordering::Greater,
             (Occupied(_, _), Blocked(_, _)) => std::cmp::Ordering::Less,
-
             // Comparisons between Blocked/Occupied and other types
             (Blocked(_, _), _) => std::cmp::Ordering::Greater,
             (_, Blocked(_, _)) => std::cmp::Ordering::Less,
-
             (Occupied(_, _), _) => std::cmp::Ordering::Greater,
             (_, Occupied(_, _)) => std::cmp::Ordering::Less,
-
             // Direct comparison for Traversable variants
             (Traversable(a), Traversable(b)) => a.cmp(b),
             (Traversable(_), _) => std::cmp::Ordering::Greater,
             (_, Traversable(_)) => std::cmp::Ordering::Less,
-
             // Goal comparisons
             (Goal, Goal) => std::cmp::Ordering::Equal,
         }

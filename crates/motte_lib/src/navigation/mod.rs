@@ -5,7 +5,7 @@ use crate::{
     app_state::AppState,
     movement::MovementSystems,
     navigation::{
-        agent::{agent_type, AgentType, DesiredVelocity, Seek, Speed, TargetDistance},
+        agent::{agent_type, AgentType, Blocking, DesiredDirection, DesiredVelocity, Speed, TargetDistance},
         avoidance::AvoidancePlugin,
         flow_field::{FlowFieldAgentPlugin, FlowFieldPlugin, FlowFieldSystems},
         obstacle::Obstacle,
@@ -13,8 +13,6 @@ use crate::{
     prelude::*,
     stats::stat::StatPlugin,
 };
-
-// TODO: Resource for RebuildFlows* RebuildObstacle* unsafe poke for when to trigger rebuild.
 
 pub mod agent;
 pub mod avoidance;
@@ -29,7 +27,7 @@ pub mod sonar;
 pub enum NavigationSystems {
     Setup,
     Maintain,
-    Seek,
+    Velocity,
     Avoidance,
     ApplyVelocity,
     Cleanup,
@@ -39,7 +37,7 @@ pub struct NavigationPlugin;
 
 impl Plugin for NavigationPlugin {
     fn build(&self, app: &mut App) {
-        app_register_types!(Agent, Obstacle, Seek, TargetDistance, DesiredVelocity, Speed);
+        app_register_types!(Agent, Obstacle, DesiredDirection, TargetDistance, DesiredVelocity, Blocking, Speed);
 
         app.add_plugins(FlowFieldPlugin);
         app.add_plugins((AutomaticUpdate::<agent::Agent>::new(), AutomaticUpdate::<obstacle::Obstacle>::new()));
@@ -56,7 +54,7 @@ impl Plugin for NavigationPlugin {
             (
                 NavigationSystems::Setup,
                 NavigationSystems::Maintain.before(FlowFieldSystems::Maintain),
-                NavigationSystems::Seek.after(FlowFieldSystems::Pathing),
+                NavigationSystems::Velocity.after(FlowFieldSystems::Pathing),
                 NavigationSystems::Avoidance.after(FlowFieldSystems::Pathing),
                 NavigationSystems::ApplyVelocity.after(FlowFieldSystems::Pathing).before(MovementSystems::Motor),
                 NavigationSystems::Cleanup.after(MovementSystems::State),
@@ -70,8 +68,8 @@ impl Plugin for NavigationPlugin {
         app.add_systems(
             FixedUpdate,
             (
-                (obstacle::obstacle, agent::footprint).in_set(NavigationSystems::Maintain),
-                (agent::seek).in_set(NavigationSystems::Seek),
+                (obstacle::obstacle, agent::blocking).in_set(NavigationSystems::Maintain),
+                (agent::desired_velocity).in_set(NavigationSystems::Velocity),
                 (agent::apply_velocity).in_set(NavigationSystems::ApplyVelocity),
             ),
         );

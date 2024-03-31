@@ -47,21 +47,20 @@ impl std::fmt::Display for Agent {
 pub struct AgentType<const AGENT: Agent>;
 
 #[derive(Component, Clone, Copy, Deref, DerefMut, Default, From, Reflect)]
-pub struct Seek(pub Option<Direction2d>);
-impl Seek {
-    pub fn as_vec(&self) -> Vec2 {
-        self.0.map(|d| d.xy()).unwrap_or(Vec2::ZERO)
-    }
-}
+pub struct DesiredDirection(pub Option<Direction2d>);
 
 #[derive(Component, Debug, Clone, Copy, Deref, DerefMut, Default, Reflect)]
 pub struct DesiredVelocity(Vec2);
 
-#[derive(Component, Clone, Copy, Deref, DerefMut, Default, From, Reflect)]
-pub struct TargetDistance(f32);
+#[derive(Component, Default, Reflect)]
+#[component(storage = "SparseSet")]
+pub struct Blocking;
 
 #[derive(Stat, Component, Reflect)]
 pub struct Speed(f32);
+
+#[derive(Component, Clone, Copy, Deref, DerefMut, Default, From, Reflect)]
+pub struct TargetDistance(f32);
 
 #[derive(Component, Default, Reflect)]
 #[component(storage = "SparseSet")]
@@ -91,16 +90,18 @@ impl TargetReachedCondition {
 
 pub(super) fn setup(mut commands: Commands, agents: Query<Entity, Added<Agent>>) {
     for entity in &agents {
-        commands.entity(entity).insert((DesiredVelocity::default(), Seek(None), TargetDistance(0.0)));
+        commands.entity(entity).insert((DesiredVelocity::default(), DesiredDirection(None), TargetDistance(0.0)));
     }
 }
 
 type MovingAgents = (With<Agent>, Without<TargetReached>);
 
-pub(super) fn seek(mut agents: Query<(Option<&Seek>, &Speed, &mut DesiredVelocity), MovingAgents>) {
-    agents.par_iter_mut().for_each(|(seek, speed, mut desired_velocity)| {
-        if let Some(seek) = seek
-            && let Some(dir) = **seek
+pub(super) fn desired_velocity(
+    mut agents: Query<(Option<&DesiredDirection>, &Speed, &mut DesiredVelocity), MovingAgents>,
+) {
+    agents.par_iter_mut().for_each(|(desired_direction, speed, mut desired_velocity)| {
+        if let Some(desired_direction) = desired_direction
+            && let Some(dir) = **desired_direction
         {
             **desired_velocity = dir.xy() * **speed;
         }
@@ -122,37 +123,39 @@ pub(super) fn apply_velocity(mut agents: Query<(&mut DesiredVelocity, &mut Movem
 pub(super) fn target_reached(
     commands: ParallelCommands,
     mut agents: Query<
-        (Entity, &Agent, &Seek, &TargetDistance, &TargetReachedCondition, Has<TargetReached>),
+        (Entity, &Agent, &DesiredDirection, &TargetDistance, &TargetReachedCondition, Has<TargetReached>),
         With<Agent>,
     >,
 ) {
-    agents.par_iter_mut().for_each(|(entity, agent, seek, distance, target_reached_condition, target_reached)| {
-        commands.command_scope(|mut c| {
-            if seek.is_some() && target_reached_condition.has_reached_target(agent, **distance) {
-                if !target_reached {
-                    c.entity(entity).insert(TargetReached);
+    agents.par_iter_mut().for_each(
+        |(entity, agent, desired_direction, distance, target_reached_condition, target_reached)| {
+            commands.command_scope(|mut c| {
+                if desired_direction.is_some() && target_reached_condition.has_reached_target(agent, **distance) {
+                    if !target_reached {
+                        c.entity(entity).insert(TargetReached);
+                    }
+                } else if target_reached {
+                    c.entity(entity).remove::<TargetReached>();
                 }
-            } else if target_reached {
-                c.entity(entity).remove::<TargetReached>();
-            }
-        });
-    });
+            });
+        },
+    );
 }
 
-pub(super) fn footprint(
+pub(super) fn blocking(
     commands: ParallelCommands,
-    idle: Query<Entity, (With<Agent>, Or<(Without<Goal>, With<TargetReached>)>, Without<Footprint>)>,
-    pathing: Query<Entity, (With<Agent>, With<Goal>, Without<TargetReached>, With<Footprint>)>,
+    idle: Query<Entity, (With<Agent>, Or<(Without<Goal>, With<TargetReached>)>, Without<Blocking>)>,
+    pathing: Query<Entity, (With<Agent>, With<Goal>, Without<TargetReached>, With<Blocking>)>,
 ) {
     idle.par_iter().for_each(|entity| {
         commands.command_scope(|mut c| {
-            c.entity(entity).insert(Footprint::default());
+            c.entity(entity).insert((Footprint::default(), Blocking));
         });
     });
 
     pathing.par_iter().for_each(|entity| {
         commands.command_scope(|mut c| {
-            c.entity(entity).remove::<Footprint>();
+            c.entity(entity).remove::<Footprint>().remove::<Blocking>();
         });
     });
 }
@@ -178,8 +181,6 @@ pub(super) fn agent_type<const AGENT: Agent>(
         });
     }
 }
-
-// TODO: if agent is
 
 #[cfg(feature = "dev_tools")]
 pub(crate) fn gizmos(mut gizmos: Gizmos, agents: Query<(&Agent, &GlobalTransform)>) {
