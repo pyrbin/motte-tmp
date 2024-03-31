@@ -83,7 +83,10 @@ pub(super) fn sync(
         dodgy_agent.position = global_transform.translation().xz();
         dodgy_agent.velocity = velocity.xy();
         dodgy_agent.radius = agent.radius();
-        dodgy_agent.avoidance_responsibility = if is_blocking { f32::EPSILON } else { 10.0 };
+        const RESPONSIBILITY_FACTOR: f32 = 100.0;
+        // TODO: smaller agents should have a larger responsibility ?
+        dodgy_agent.avoidance_responsibility =
+            if is_blocking { f32::EPSILON } else { agent.size() * RESPONSIBILITY_FACTOR };
     });
 }
 
