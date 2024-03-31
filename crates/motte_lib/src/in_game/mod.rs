@@ -32,7 +32,7 @@ impl Plugin for InGamePlugin {
         app.add_systems(OnEnter(AppState::InGame), setup);
         app.add_systems(Update, click);
 
-        const DEFAULT_SIZE: (usize, usize) = (16 * 8, 9 * 8);
+        const DEFAULT_SIZE: (u8, u8) = (16 * 8, 9 * 8);
         let layout = FieldLayout::new(DEFAULT_SIZE.0, DEFAULT_SIZE.1);
         let obstacles = ObstacleField::from_layout(&layout);
 

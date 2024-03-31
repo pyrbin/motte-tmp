@@ -412,7 +412,7 @@ pub(super) fn finalize_velocity(
     );
 }
 
-#[inline(always)]
+#[inline]
 fn intersect_line(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2) -> Option<(Vec2, f32)> {
     let s1 = p1 - p0;
     let s2 = p3 - p2;
@@ -433,7 +433,7 @@ fn intersect_line(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2) -> Option<(Vec2, f32)>
     None
 }
 
-#[inline(always)]
+#[inline]
 fn wall_constraint(xp: Vec2, radius: f32, segment: (Vec2, Vec2)) -> Option<Vec3> {
     let a = xp - segment.0;
     let b = segment.1 - segment.0; // segment direction

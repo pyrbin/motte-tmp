@@ -8,10 +8,10 @@ use crate::{movement::motor::Movement, prelude::*};
 #[repr(u8)]
 pub enum Agent {
     #[default]
-    Small = CELL_SIZE as u8,
-    Medium = CELL_SIZE as u8 * 3,
-    Large = CELL_SIZE as u8 * 5,
-    Huge = CELL_SIZE as u8 * 7,
+    Small = CELL_SIZE,
+    Medium = CELL_SIZE * 3,
+    Large = CELL_SIZE * 5,
+    Huge = CELL_SIZE * 7,
 }
 
 impl Agent {

@@ -65,7 +65,7 @@ pub(super) fn seek<const AGENT: Agent>(
 
         let (flow_field, footprint) = flow_fields.get(entry.0).unwrap();
 
-        if flow_field.empty() {
+        if flow_field.is_empty() {
             *seek = Seek(None);
             **target_distance = 0.0;
             return;

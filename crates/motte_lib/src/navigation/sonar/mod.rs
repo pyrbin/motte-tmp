@@ -102,7 +102,7 @@ pub fn sonar(
     });
 }
 
-#[inline(always)]
+#[inline]
 fn tangent_line_to_circle_angle(radius: f32, distance: f32) -> f32 {
     let hyp = distance.max(radius);
     let opp = radius;

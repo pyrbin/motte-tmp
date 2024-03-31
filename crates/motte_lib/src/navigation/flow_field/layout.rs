@@ -1,87 +1,51 @@
-use super::fields::Cell;
+use super::fields::{self, Cell};
 use crate::{navigation::agent::Agent, prelude::*};
 
-pub const CELL_SIZE: usize = 1;
+pub const CELL_SIZE: fields::Scalar = 1;
 pub const CELL_SIZE_F32: f32 = CELL_SIZE as f32;
 pub const HALF_CELL_SIZE: f32 = CELL_SIZE_F32 / 2.0;
 
 #[derive(Resource, Clone, Copy, Reflect)]
 pub struct FieldLayout {
-    width: usize,
-    height: usize,
+    width: fields::Scalar,
+    height: fields::Scalar,
     offset: Vec2,
 }
 
 impl Default for FieldLayout {
     fn default() -> Self {
-        const WIDTH: usize = 64;
-        const HEIGHT: usize = 64;
+        const WIDTH: fields::Scalar = 64;
+        const HEIGHT: fields::Scalar = 64;
         Self { width: WIDTH, height: HEIGHT, offset: centered_offset(WIDTH, HEIGHT) }
     }
 }
 
 impl FieldLayout {
-    pub fn new(width: usize, height: usize) -> Self {
+    pub const fn new(width: fields::Scalar, height: fields::Scalar) -> Self {
+        debug_assert!(width <= fields::Scalar::MAX && height <= fields::Scalar::MAX);
+
         let mut layout = Self { width, height, ..Default::default() };
         layout.offset = centered_offset(layout.width, layout.height);
         layout
     }
 
     #[inline]
-    pub fn cell(&self, global_position_xz: Vec2) -> Cell {
-        let translation = self.transform_point(global_position_xz);
-        Cell::round((translation.x / CELL_SIZE_F32, translation.y / CELL_SIZE_F32))
-    }
-
-    #[inline]
-    pub fn cell_from_index(&self, index: usize) -> Cell {
-        Cell::from_index(index, self.width())
-    }
-
-    #[inline]
-    pub fn position(&self, cell: Cell) -> Vec2 {
-        let offset = self.offset();
-        let world_x = cell.x() as f32 * CELL_SIZE_F32 + offset.x;
-        let world_z = cell.y() as f32 * CELL_SIZE_F32 + offset.y;
-        Vec2::new(world_x, world_z)
-    }
-
-    #[inline]
-    pub fn transform_point(&self, global_position_xz: Vec2) -> Vec2 {
-        global_position_xz - self.offset()
-    }
-
-    #[inline]
-    pub fn index(&self, cell: Cell) -> Option<usize> {
-        if self.valid(cell) {
-            Some(cell.index(self.width))
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    pub fn valid(&self, cell: Cell) -> bool {
-        cell.x() < self.width && cell.y() < self.height
-    }
-
-    #[inline]
-    pub fn width(&self) -> usize {
+    pub const fn width(&self) -> fields::Scalar {
         self.width
     }
 
     #[inline]
-    pub fn height(&self) -> usize {
+    pub const fn height(&self) -> fields::Scalar {
         self.height
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        self.width * self.height
+    pub const fn len(&self) -> usize {
+        self.width as usize * self.height as usize
     }
 
     #[inline]
-    fn offset(&self) -> Vec2 {
+    pub const fn offset(&self) -> Vec2 {
         self.offset
     }
 
@@ -91,10 +55,48 @@ impl FieldLayout {
     }
 
     #[inline]
+    pub const fn cell(&self, global_position_xz: Vec2) -> Cell {
+        let translation = self.transform_point(global_position_xz);
+        Cell::round((translation.x / CELL_SIZE_F32, translation.y / CELL_SIZE_F32))
+    }
+
+    #[inline]
+    pub const fn cell_from_index(&self, index: usize) -> Cell {
+        Cell::from_index(index, self.width())
+    }
+
+    #[inline]
+    pub const fn position(&self, cell: Cell) -> Vec2 {
+        let offset = self.offset();
+        let world_x = cell.x() as f32 * CELL_SIZE_F32 + offset.x;
+        let world_z = cell.y() as f32 * CELL_SIZE_F32 + offset.y;
+        Vec2::new(world_x, world_z)
+    }
+
+    #[inline]
+    pub const fn transform_point(&self, global_position_xz: Vec2) -> Vec2 {
+        global_position_xz - self.offset()
+    }
+
+    #[inline]
+    pub const fn index(&self, cell: Cell) -> Option<usize> {
+        if self.valid(cell) {
+            Some(cell.index(self.width))
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub const fn valid(&self, cell: Cell) -> bool {
+        cell.x() < self.width && cell.y() < self.height
+    }
+
+    #[inline]
     pub fn bounds(&self, agent: Agent) -> impl Iterator<Item = Cell> {
         let width = self.width();
         let height = self.height();
-        let offset = agent.radius().ceil() as usize;
+        let offset = agent.radius().ceil() as u8;
         let top_bottom = (0..width).flat_map(move |x| {
             std::iter::once(Cell::new(x, offset - 1)).chain(std::iter::once(Cell::new(x, height - offset)))
         });
@@ -115,7 +117,7 @@ pub(super) fn field_bounds<const AGENT: Agent>(layout: Res<FieldLayout>, mut fie
 }
 
 #[inline]
-fn centered_offset(width: usize, height: usize) -> Vec2 {
+const fn centered_offset(width: fields::Scalar, height: fields::Scalar) -> Vec2 {
     Vec2::new(
         -(width as f32 / 2.0) * CELL_SIZE_F32 + HALF_CELL_SIZE,
         -(height as f32 / 2.0) * CELL_SIZE_F32 + HALF_CELL_SIZE,

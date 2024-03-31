@@ -18,22 +18,16 @@ pub struct ObstacleField {
     occupant: Field<Occupant>,
 }
 
-impl std::ops::Deref for ObstacleField {
-    type Target = Field<Cost>;
-    fn deref(&self) -> &Self::Target {
-        &self.cost
-    }
-}
-
 impl ObstacleField {
-    pub fn from_layout(field_layout: &FieldLayout) -> Self {
+    pub fn from_layout(layout: &FieldLayout) -> Self {
+        let len: usize = layout.len();
         Self {
-            cost: Field::new(field_layout.width(), field_layout.height(), vec![default(); field_layout.len()]),
-            occupant: Field::new(field_layout.width(), field_layout.height(), vec![default(); field_layout.len()]),
+            cost: Field::new(layout.width(), layout.height(), vec![default(); len]),
+            occupant: Field::new(layout.width(), layout.height(), vec![default(); len]),
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn splat(&mut self, cells: &[Cell], cost: Cost, occupant: Occupant) {
         for &cell in cells {
             if !self.valid(cell) {
@@ -44,7 +38,7 @@ impl ObstacleField {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn traversable(&self, cell: Cell, agent_radius: Agent) -> bool {
         self.cost[cell].traversable(agent_radius)
     }
@@ -53,12 +47,19 @@ impl ObstacleField {
         self.occupant[cell]
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn clear(&mut self) {
         for i in 0..self.len() {
             self.cost[i] = Cost::default();
             self.occupant[i] = Occupant::Empty;
         }
+    }
+}
+
+impl std::ops::Deref for ObstacleField {
+    type Target = Field<Cost>;
+    fn deref(&self) -> &Self::Target {
+        &self.cost
     }
 }
 
@@ -95,13 +96,13 @@ pub struct DirtyObstacleField;
 
 pub type ObstacleFilter = Or<(With<Obstacle>, (With<Agent>, Without<Goal>), (With<Agent>, With<TargetReached>))>;
 
-#[inline(always)]
+#[inline]
 pub(in crate::navigation) fn clear(mut obstacle_field: ResMut<ObstacleField>) {
     info!(target: "obstacle_field", "clear");
     obstacle_field.clear();
 }
 
-#[inline(always)]
+#[inline]
 pub(in crate::navigation) fn splat<const AGENT: Agent>(
     mut obstacle_field: ResMut<ObstacleField>,
     obstacles: Query<(&ExpandedFootprint<AGENT>, Has<Agent>), ObstacleFilter>,
@@ -120,7 +121,7 @@ pub(in crate::navigation) fn splat<const AGENT: Agent>(
 }
 
 /// Cost of cells that exist in [`ExpandedFootprint<{ `agent` }>`].
-#[inline(always)]
+#[inline]
 const fn expanded_traversable(agent: Agent) -> Cost {
     match agent {
         Agent::Small => Cost::Blocked,

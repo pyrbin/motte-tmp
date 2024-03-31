@@ -4,7 +4,7 @@ use super::{
     CellIndex,
 };
 use crate::{
-    navigation::{agent::Agent, obstacle::Obstacle},
+    navigation::{agent::Agent, flow_field::fields, obstacle::Obstacle},
     prelude::*,
     utils::math::point_in_poly2d,
 };
@@ -30,17 +30,17 @@ impl Footprint {
         None
     }
 
-    #[inline(always)]
-    pub fn expand(&self, radius: usize) -> Option<impl Iterator<Item = Cell> + '_> {
+    #[inline]
+    pub fn expand(&self, radius: u32) -> Option<impl Iterator<Item = Cell> + '_> {
         debug_assert!(radius > 0);
         if let Footprint::Cells(cells) = self {
             return Some(cells.iter().flat_map(move |&cell| {
-                (-(radius as isize)..=radius as isize).step_by(CELL_SIZE).flat_map(move |dx| {
-                    (-(radius as isize)..=radius as isize).step_by(CELL_SIZE).filter_map(move |dy| {
-                        let x = (cell.x() as isize + dx) as usize;
-                        let y = (cell.y() as isize + dy) as usize;
+                (-(radius as isize)..=radius as isize).step_by(CELL_SIZE.into()).flat_map(move |dx| {
+                    (-(radius as isize)..=radius as isize).step_by(CELL_SIZE.into()).filter_map(move |dy| {
+                        let x = (cell.x() as isize + dx) as fields::Scalar;
+                        let y = (cell.y() as isize + dy) as fields::Scalar;
                         let expanded_cell = Cell::new(x, y);
-                        if cell.coordinate_distance(expanded_cell) <= radius {
+                        if cell.chebyshev(expanded_cell) <= radius {
                             Some(expanded_cell)
                         } else {
                             None
@@ -82,8 +82,8 @@ pub(super) fn agents(
 
             *footprint = Footprint::Cells(
                 (min_cell.x()..=max_cell.x())
-                    .step_by(CELL_SIZE)
-                    .flat_map(|x| (min_cell.y()..=max_cell.y()).step_by(CELL_SIZE).map(move |y| Cell::new(x, y)))
+                    .step_by(CELL_SIZE.into())
+                    .flat_map(|x| (min_cell.y()..=max_cell.y()).step_by(CELL_SIZE.into()).map(move |y| Cell::new(x, y)))
                     .filter(|&cell| center.euclidean_sqrt(cell) <= agent_radius_sqrt)
                     .collect(),
             );
@@ -108,8 +108,8 @@ pub(super) fn obstacles(
 
         *footprint = Footprint::Cells(
             (min_cell.x()..=max_cell.x())
-                .step_by(CELL_SIZE)
-                .flat_map(|x| (min_cell.y()..=max_cell.y()).step_by(CELL_SIZE).map(move |y| Cell::new(x, y)))
+                .step_by(CELL_SIZE.into())
+                .flat_map(|x| (min_cell.y()..=max_cell.y()).step_by(CELL_SIZE.into()).map(move |y| Cell::new(x, y)))
                 .filter(|&cell| layout.index(cell).is_some() && point_in_poly2d(layout.position(cell), shape))
                 .collect(),
         );
@@ -148,7 +148,7 @@ pub(super) fn setup<const AGENT: Agent>(
 pub(super) fn expand<const AGENT: Agent>(
     mut footprints: Query<(&Footprint, &mut ExpandedFootprint<AGENT>), Changed<Footprint>>,
 ) {
-    let expansion = AGENT.radius().floor() as usize;
+    let expansion = AGENT.radius().floor() as u32;
 
     footprints.par_iter_mut().for_each(|(footprint, mut expanded_footprint)| {
         if expansion <= 0 {

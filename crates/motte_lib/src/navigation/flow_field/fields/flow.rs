@@ -1,16 +1,17 @@
 use std::{cmp::Reverse, collections::BinaryHeap};
 
-use super::{obstacle::ObstacleField, Cell, Direction, Field};
+use super::{
+    obstacle::{ObstacleField, Occupant},
+    Cell, Direction, Field,
+};
 use crate::{
     navigation::{
         agent::Agent,
         flow_field::{
-            fields::obstacle::Occupant,
             footprint::{ExpandedFootprint, Footprint},
-            layout::{FieldBounds, FieldLayout},
+            layout::FieldLayout,
             CellIndex,
         },
-        obstacle::Obstacle,
     },
     prelude::*,
 };
@@ -33,22 +34,16 @@ impl<const AGENT: Agent> std::ops::Deref for FlowField<AGENT> {
 
 impl<const AGENT: Agent> FlowField<AGENT> {
     pub fn from_layout(layout: &FieldLayout) -> Self {
-        let size = layout.width() * layout.height();
+        let len: usize = layout.len();
         Self {
-            flow: Field::new(layout.width(), layout.height(), vec![Direction::None; size]),
-            integration: Field::new(layout.width(), layout.height(), vec![IntegrationCost::default(); size]),
+            flow: Field::new(layout.width(), layout.height(), vec![Direction::None; len]),
+            integration: Field::new(layout.width(), layout.height(), vec![IntegrationCost::default(); len]),
             heap: Heap::new(layout.width(), layout.height()),
         }
     }
 
-    #[inline(always)]
-    pub fn build(
-        &mut self,
-        goals: impl Iterator<Item = Cell>,
-        obstacle_field: &ObstacleField,
-        obstacles: impl Iterator<Item = (Cell, &[Cell])>,
-        bounds: &[Cell],
-    ) {
+    #[inline]
+    pub fn build(&mut self, goals: impl Iterator<Item = Cell>, obstacle_field: &ObstacleField) {
         debug_assert!(self.len() == obstacle_field.len());
 
         let (flow, integration, heap) = (&mut self.flow, &mut self.integration, &mut self.heap);
@@ -67,13 +62,14 @@ impl<const AGENT: Agent> FlowField<AGENT> {
             flow[goal] = Direction::None;
         }
 
-        let is_diagonal_neighbor_valid = |cell: Cell, direction: Direction| {
+        let is_traversable = |cell: Cell| obstacle_field.traversable(cell, AGENT);
+        let is_diagonal_move_traversable = |cell: Cell, direction: Direction| {
             let check = |direction: Direction| {
                 let cell = cell.neighbor(direction);
                 let Some(cell) = cell else {
                     return false;
                 };
-                obstacle_field.traversable(cell, AGENT)
+                is_traversable(cell)
             };
 
             match direction {
@@ -85,26 +81,8 @@ impl<const AGENT: Agent> FlowField<AGENT> {
             }
         };
 
-        let is_traversable = |cell: Cell| obstacle_field.traversable(cell, AGENT);
-
         while let Some((cell, _)) = heap.pop() {
             let mut process = |neighbor: Cell| {
-                const fn valid_transition(current: IntegrationCost, neighbor: IntegrationCost) -> bool {
-                    use IntegrationCost::*;
-                    match current {
-                        Blocked(_, _) => matches!(neighbor, Blocked(_, _) | Goal),
-                        Occupied(d, _) => {
-                            if d == GOAL_DEPTH {
-                                matches!(neighbor, Traversable(_) | Occupied(_, _) | Goal)
-                            } else {
-                                matches!(neighbor, Occupied(_, _) | Goal)
-                            }
-                        }
-                        Traversable(_) => true,
-                        Goal => true,
-                    }
-                }
-
                 let current: IntegrationCost = integration[cell];
                 let cost = if is_traversable(neighbor) {
                     // Traversable
@@ -124,7 +102,7 @@ impl<const AGENT: Agent> FlowField<AGENT> {
                     }
                 };
 
-                if valid_transition(current, cost) && cost < integration[neighbor] {
+                if current.valid_traversal(cost) && cost < integration[neighbor] {
                     integration[neighbor] = cost;
                     if !heap.contains(neighbor) {
                         heap.push(neighbor, cost);
@@ -137,7 +115,7 @@ impl<const AGENT: Agent> FlowField<AGENT> {
             }
 
             for neighbor in
-                obstacle_field.diagonal(cell).filter(|&n| is_diagonal_neighbor_valid(cell, cell.direction(n)))
+                obstacle_field.diagonal(cell).filter(|&n| is_diagonal_move_traversable(cell, cell.direction(n)))
             {
                 process(neighbor);
             }
@@ -149,7 +127,7 @@ impl<const AGENT: Agent> FlowField<AGENT> {
             let cell = Cell::from_index(i, width);
             if let Some(min) = integration
                 .adjacent(cell)
-                .chain(integration.diagonal(cell).filter(|&n| is_diagonal_neighbor_valid(cell, cell.direction(n))))
+                .chain(integration.diagonal(cell).filter(|&n| is_diagonal_move_traversable(cell, cell.direction(n))))
                 .min_by(|a, b| integration[*a].cmp(&integration[*b]))
             {
                 flow[cell] = cell.direction(min);
@@ -193,8 +171,11 @@ struct Heap {
 
 impl Heap {
     #[inline]
-    fn new(width: usize, height: usize) -> Self {
-        Self { heap: BinaryHeap::new(), contains: Field::new(width, height, vec![false; width * height]) }
+    fn new(width: super::Scalar, height: super::Scalar) -> Self {
+        Self {
+            heap: BinaryHeap::new(),
+            contains: Field::new(width, height, vec![false; width as usize * height as usize]),
+        }
     }
 
     #[inline]
@@ -245,12 +226,15 @@ impl Default for IntegrationCost {
 }
 
 impl IntegrationCost {
+    #[inline]
     pub const fn cost(&self) -> u8 {
         use IntegrationCost::*;
         match self {
             Blocked(d, c) => d.saturating_mul(*c),
             Occupied(d, c) => {
                 if *d == GOAL_DEPTH {
+                    // We don't carry the depth cost for Occupied(GOAL_DEPTH, _), as this means the goal is
+                    // surrounded by agents, and we want to prefer moving towards the goal.
                     *c
                 } else {
                     d.saturating_mul(*c)
@@ -261,6 +245,26 @@ impl IntegrationCost {
         }
     }
 
+    #[inline]
+    pub const fn valid_traversal(&self, neighbor: IntegrationCost) -> bool {
+        use IntegrationCost::*;
+        match self {
+            Blocked(_, _) => matches!(neighbor, Blocked(_, _) | Goal),
+            Occupied(d, _) => {
+                if *d == GOAL_DEPTH {
+                    // We can transition from Occupied(GOAL_DEPTH, _) to Traversable(_) as this means the goal is
+                    // surrounded by agents, and we want to continue the traversal.
+                    matches!(neighbor, Traversable(_) | Occupied(_, _) | Goal)
+                } else {
+                    matches!(neighbor, Occupied(_, _) | Goal)
+                }
+            }
+            Traversable(_) => true,
+            Goal => true,
+        }
+    }
+
+    #[inline]
     pub const fn depth_and_cost(&self) -> (u8, u8) {
         use IntegrationCost::*;
         match self {
@@ -315,7 +319,7 @@ impl Ord for IntegrationCost {
     }
 }
 
-#[inline(always)]
+#[inline]
 pub(in crate::navigation) fn build<const AGENT: Agent>(
     commands: ParallelCommands,
     mut flow_fields: Query<
@@ -323,8 +327,6 @@ pub(in crate::navigation) fn build<const AGENT: Agent>(
         With<Dirty<FlowField<AGENT>>>,
     >,
     obstacle_field: Res<ObstacleField>,
-    obstacles: Query<(&ExpandedFootprint<AGENT>, &CellIndex), super::obstacle::ObstacleFilter>,
-    bounds: Res<FieldBounds<AGENT>>,
 ) {
     flow_fields.par_iter_mut().for_each(|(entity, mut flow_field, cell_index, footprint)| {
         let goals = match footprint {
@@ -335,20 +337,7 @@ pub(in crate::navigation) fn build<const AGENT: Agent>(
 
         let now = std::time::Instant::now();
 
-        flow_field.build(
-            goals.into_iter(),
-            &obstacle_field,
-            obstacles.iter().filter_map(|(footprint, cell_index)| {
-                if let ExpandedFootprint::Cells(cells) = footprint
-                    && let CellIndex::Valid(cell, _) = cell_index
-                {
-                    Some((*cell, cells.as_slice()))
-                } else {
-                    None
-                }
-            }),
-            bounds.as_slice(),
-        );
+        flow_field.build(goals.into_iter(), &obstacle_field);
 
         let end = std::time::Instant::now() - now;
 

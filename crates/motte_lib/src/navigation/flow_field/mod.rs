@@ -9,6 +9,7 @@ use crate::{
                 flow::FlowField,
                 obstacle::{DirtyObstacleField, ObstacleField},
             },
+            footprint::ExpandedFootprint,
             layout::FieldBounds,
         },
     },
@@ -81,7 +82,7 @@ pub struct FlowFieldAgentPlugin<const AGENT: Agent>;
 
 impl<const AGENT: Agent> Plugin for FlowFieldAgentPlugin<AGENT> {
     fn build(&self, app: &mut App) {
-        app_register_types!(FlowField<AGENT>, FlowFieldCache<AGENT>, FieldBounds::<AGENT>);
+        app_register_types!(FlowField<AGENT>, FlowFieldCache<AGENT>, FieldBounds<AGENT>, ExpandedFootprint<AGENT>);
 
         app.insert_resource(FlowFieldCache::<AGENT>::default());
         app.insert_resource(FieldBounds::<AGENT>::default());
