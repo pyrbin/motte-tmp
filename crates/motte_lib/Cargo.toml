@@ -6,6 +6,7 @@ edition = "2021"
 
 [features]
 default = ["dev_tools"]
+dynamic_linking = ["bevy/dynamic_linking"]
 dev_tools = [
     "dep:bevy-inspector-egui",
     "dep:iyes_perf_ui",
@@ -17,12 +18,13 @@ dev_tools = [
 [dependencies]
 bevy_xpbd_3d = { version = "0.4.2", default-features = true, features = ["simd"] }
 bevy_xpbd_3d_interp = "0.1.2"
-parry2d = { version = "0.13" }
+dodgy_2d = { version = "0.4.0" }
 bevy_asset_loader = { version = "0.20", features = ["2d", "3d"]}
 bevy_common_assets = "0.10.0"
 bevy_spatial = { version = "0.8.0", features = ["kdtree"] }
 bevy_mod_picking = { version = "0.18"}
 bevy_transform_gizmo = { git = "https://github.com/rydb/bevy_transform_gizmo.git", branch = "main" }
+parry2d = { version = "0.13" }
 
 # internal
 motte_macros = { path = "../motte_macros" }

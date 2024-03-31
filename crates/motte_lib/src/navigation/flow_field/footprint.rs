@@ -1,4 +1,8 @@
-use super::{fields::Cell, layout::FieldLayout, CellIndex};
+use super::{
+    fields::Cell,
+    layout::{FieldLayout, CELL_SIZE, HALF_CELL_SIZE},
+    CellIndex,
+};
 use crate::{
     navigation::{agent::Agent, obstacle::Obstacle},
     prelude::*,
@@ -11,15 +15,14 @@ use crate::{
 pub enum Footprint {
     #[default]
     Empty,
-    Cells(SmallVec<[Cell; 8]>),
+    Cells(SmallVec<[Cell; 16]>),
 }
 
 impl Footprint {
-    pub fn empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         matches!(self, Footprint::Empty)
     }
 
-    #[inline]
     pub fn cells(&self) -> Option<&[Cell]> {
         if let Footprint::Cells(cells) = self {
             return Some(cells);
@@ -27,13 +30,13 @@ impl Footprint {
         None
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn expand(&self, radius: usize) -> Option<impl Iterator<Item = Cell> + '_> {
         debug_assert!(radius > 0);
         if let Footprint::Cells(cells) = self {
             return Some(cells.iter().flat_map(move |&cell| {
-                (-(radius as isize)..=radius as isize).flat_map(move |dx| {
-                    (-(radius as isize)..=radius as isize).filter_map(move |dy| {
+                (-(radius as isize)..=radius as isize).step_by(CELL_SIZE).flat_map(move |dx| {
+                    (-(radius as isize)..=radius as isize).step_by(CELL_SIZE).filter_map(move |dy| {
                         let x = (cell.x() as isize + dx) as usize;
                         let y = (cell.y() as isize + dy) as usize;
                         let expanded_cell = Cell::new(x, y);
@@ -51,23 +54,21 @@ impl Footprint {
 }
 
 pub(super) fn agents(
-    mut agents: Query<
-        (&mut Footprint, &Agent, &CellIndex, &GlobalTransform),
-        Or<(Changed<CellIndex>, Changed<GlobalTransform>, Changed<Agent>)>,
-    >,
+    mut agents: Query<(&mut Footprint, &Agent, &CellIndex, &GlobalTransform), Changed<CellIndex>>,
     layout: Res<FieldLayout>,
 ) {
     agents.par_iter_mut().for_each(|(mut footprint, agent, cell_index, global_transform)| match cell_index {
         CellIndex::Invalid => {
-            if !footprint.empty() {
+            if !footprint.is_empty() {
                 *footprint = Footprint::Empty;
             }
         }
-        CellIndex::Valid(_, _) => {
+        CellIndex::Valid(center, _) => {
             let layout = *layout;
-            let border_radius = layout.cell_size() / 4.0;
+            let border_radius = HALF_CELL_SIZE / 2.0;
 
             let agent_radius: f32 = agent.radius();
+            let agent_radius_sqrt = agent_radius * agent_radius;
             let agent_position = global_transform.translation().xz();
 
             let min_cell = layout.cell(Vec2::new(
@@ -81,13 +82,9 @@ pub(super) fn agents(
 
             *footprint = Footprint::Cells(
                 (min_cell.x()..=max_cell.x())
-                    .step_by(layout.cell_size() as usize)
-                    .flat_map(|x| {
-                        (min_cell.y()..=max_cell.y()).step_by(layout.cell_size() as usize).map(move |y| Cell::new(x, y))
-                    })
-                    .filter(|cell| {
-                        agent_position.distance_squared(layout.position(*cell)) <= (agent_radius * agent_radius)
-                    })
+                    .step_by(CELL_SIZE)
+                    .flat_map(|x| (min_cell.y()..=max_cell.y()).step_by(CELL_SIZE).map(move |y| Cell::new(x, y)))
+                    .filter(|&cell| center.euclidean_sqrt(cell) <= agent_radius_sqrt)
                     .collect(),
             );
         }
@@ -100,7 +97,7 @@ pub(super) fn obstacles(
 ) {
     obstacles.par_iter_mut().for_each(|(mut footprint, obstacle, aabb)| {
         let Obstacle::Shape(shape) = obstacle else {
-            if !footprint.empty() {
+            if !footprint.is_empty() {
                 *footprint = Footprint::Empty;
             }
             return;
@@ -111,10 +108,8 @@ pub(super) fn obstacles(
 
         *footprint = Footprint::Cells(
             (min_cell.x()..=max_cell.x())
-                .step_by(layout.cell_size() as usize)
-                .flat_map(|x| {
-                    (min_cell.y()..=max_cell.y()).step_by(layout.cell_size() as usize).map(move |y| Cell::new(x, y))
-                })
+                .step_by(CELL_SIZE)
+                .flat_map(|x| (min_cell.y()..=max_cell.y()).step_by(CELL_SIZE).map(move |y| Cell::new(x, y)))
                 .filter(|&cell| layout.index(cell).is_some() && point_in_poly2d(layout.position(cell), shape))
                 .collect(),
         );
@@ -127,10 +122,10 @@ pub(super) fn obstacles(
 pub enum ExpandedFootprint<const AGENT: Agent> {
     #[default]
     Empty,
-    Cells(SmallVec<[Cell; 8]>),
+    Cells(SmallVec<[Cell; 16]>),
 }
 
-pub(super) fn setup_expand<const AGENT: Agent>(
+pub(super) fn setup<const AGENT: Agent>(
     commands: ParallelCommands,
     agents: Query<Entity, Added<Footprint>>,
     mut removed: RemovedComponents<ExpandedFootprint<AGENT>>,
@@ -153,17 +148,19 @@ pub(super) fn setup_expand<const AGENT: Agent>(
 pub(super) fn expand<const AGENT: Agent>(
     mut footprints: Query<(&Footprint, &mut ExpandedFootprint<AGENT>), Changed<Footprint>>,
 ) {
-    let expansion = AGENT.radius().ceil();
+    let expansion = AGENT.radius().floor() as usize;
+
     footprints.par_iter_mut().for_each(|(footprint, mut expanded_footprint)| {
-        if expansion <= 0.0 {
+        if expansion <= 0 {
             let Footprint::Cells(cells) = footprint else {
                 *expanded_footprint = ExpandedFootprint::Empty;
                 return;
             };
             *expanded_footprint = ExpandedFootprint::Cells(cells.clone());
+            return;
         }
 
-        let Some(cells) = footprint.expand(AGENT.radius().ceil() as usize) else {
+        let Some(cells) = footprint.expand(expansion) else {
             *expanded_footprint = ExpandedFootprint::Empty;
             return;
         };
@@ -173,6 +170,8 @@ pub(super) fn expand<const AGENT: Agent>(
 
 #[cfg(feature = "dev_tools")]
 pub(crate) fn gizmos(mut gizmos: Gizmos, footprints: Query<&Footprint>, layout: Res<FieldLayout>) {
+    use super::layout::CELL_SIZE_F32;
+
     for footprint in &footprints {
         let Footprint::Cells(cells) = footprint else {
             continue;
@@ -180,12 +179,7 @@ pub(crate) fn gizmos(mut gizmos: Gizmos, footprints: Query<&Footprint>, layout: 
 
         for cell in cells {
             let position = layout.position(*cell);
-            gizmos.rect(
-                position.x0y().y_pad(),
-                Quat::from_rotation_x(PI / 2.),
-                Vec2::ONE * layout.cell_size(),
-                Color::CYAN,
-            );
+            gizmos.rect(position.x0y().y_pad(), Quat::from_rotation_x(PI / 2.), Vec2::ONE * CELL_SIZE_F32, Color::CYAN);
         }
     }
 }

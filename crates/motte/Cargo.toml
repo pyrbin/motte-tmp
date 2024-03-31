@@ -7,6 +7,7 @@ build = "build.rs"
 
 [features]
 dev_tools = ["motte_lib/dev_tools"]
+dynamic_linking = ["bevy/dynamic_linking", "motte_lib/dynamic_linking"]
 
 [dependencies.bevy]
 workspace = true
@@ -18,9 +19,6 @@ bevy_embedded_assets = "0.10.2"
 # keep the following in sync with Bevy's dependencies
 winit = { version = "0.29.15", default-features = false }
 image = { version = "0.25.0", default-features = false }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-bevy_dylib = { version = "0.13.1" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "*"

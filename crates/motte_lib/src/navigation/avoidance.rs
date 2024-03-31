@@ -14,6 +14,7 @@ use crate::{
     navigation::{
         boids::boid_avoidance,
         clearpath::{clearpath_avoidance, clearpath_integration},
+        dodgy::rvo2,
         NavigationSystems,
     },
     prelude::*,
@@ -35,15 +36,19 @@ impl Plugin for AvoidancePlugin {
         //     FixedUpdate,
         //     (explicit_integration, contact_solve, constraint_solve, finalize_velocity)
         //         .chain()
+        //         .after(rvo2)
         //         .in_set(NavigationSystems::Avoidance)
         //         .run_if(in_state(AppState::InGame)),
         // );
 
+        // app.add_systems(
+        //     FixedUpdate,
+        //     (boid_avoidance).chain().in_set(NavigationSystems::Avoidance).run_if(in_state(AppState::InGame)),
+        // );
         app.add_systems(
             FixedUpdate,
-            (boid_avoidance).chain().in_set(NavigationSystems::Avoidance).run_if(in_state(AppState::InGame)),
+            (rvo2).chain().in_set(NavigationSystems::Avoidance).run_if(in_state(AppState::InGame)),
         );
-
         // app.add_systems(
         //     FixedUpdate,
         //     (clearpath_avoidance, clearpath_integration)

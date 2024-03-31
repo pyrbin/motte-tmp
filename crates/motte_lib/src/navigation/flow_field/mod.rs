@@ -88,8 +88,7 @@ impl<const AGENT: Agent> Plugin for FlowFieldAgentPlugin<AGENT> {
 
         app.add_systems(
             FixedUpdate,
-            (cache::spawn::<AGENT>, cache::insert::<AGENT>, footprint::setup_expand::<AGENT>)
-                .in_set(FlowFieldSystems::Setup),
+            (cache::spawn::<AGENT>, cache::insert::<AGENT>, footprint::setup::<AGENT>).in_set(FlowFieldSystems::Setup),
         );
         app.add_systems(
             FixedUpdate,
@@ -143,6 +142,8 @@ pub fn cell_index(
 
 #[cfg(feature = "dev_tools")]
 pub(crate) fn gizmos_cell_index(mut gizmos: Gizmos, agents: Query<&CellIndex>, layout: Res<FieldLayout>) {
+    use self::layout::CELL_SIZE_F32;
+
     for cell_index in &agents {
         let CellIndex::Valid(cell, _) = cell_index else {
             continue;
@@ -152,7 +153,7 @@ pub(crate) fn gizmos_cell_index(mut gizmos: Gizmos, agents: Query<&CellIndex>, l
         gizmos.rect(
             position.x0y().y_pad(),
             Quat::from_rotation_x(PI / 2.),
-            Vec2::ONE * layout.cell_size(),
+            Vec2::ONE * CELL_SIZE_F32,
             Color::YELLOW.with_a(1.0),
         );
     }

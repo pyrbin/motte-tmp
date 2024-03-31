@@ -8,11 +8,6 @@ use bevy::{
     window::{PresentMode, PrimaryWindow, WindowPlugin},
     winit::WinitWindows,
 };
-/// This will cause Bevy to be dynamically linked during development.
-#[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
-#[allow(unused_imports)]
-#[allow(clippy::single_component_path_imports)]
-use bevy_dylib;
 use bevy_embedded_assets::{EmbeddedAssetPlugin, PluginMode};
 
 pub fn name() -> &'static str {

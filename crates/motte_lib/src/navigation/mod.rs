@@ -20,6 +20,7 @@ pub mod agent;
 pub mod avoidance;
 pub mod boids;
 pub mod clearpath;
+pub mod dodgy;
 pub mod flow_field;
 pub mod obstacle;
 pub mod sonar;
@@ -69,7 +70,7 @@ impl Plugin for NavigationPlugin {
         app.add_systems(
             FixedUpdate,
             (
-                (obstacle::obstacle).in_set(NavigationSystems::Maintain),
+                (obstacle::obstacle, agent::footprint).in_set(NavigationSystems::Maintain),
                 (agent::seek).in_set(NavigationSystems::Seek),
                 (agent::apply_velocity).in_set(NavigationSystems::ApplyVelocity),
             ),

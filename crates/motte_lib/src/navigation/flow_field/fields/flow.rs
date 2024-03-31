@@ -5,6 +5,7 @@ use crate::{
     navigation::{
         agent::Agent,
         flow_field::{
+            fields::obstacle::Occupant,
             footprint::{ExpandedFootprint, Footprint},
             layout::{FieldBounds, FieldLayout},
             CellIndex,
@@ -35,7 +36,7 @@ impl<const AGENT: Agent> FlowField<AGENT> {
         let size = layout.width() * layout.height();
         Self {
             flow: Field::new(layout.width(), layout.height(), vec![Direction::None; size]),
-            integration: Field::new(layout.width(), layout.height(), vec![IntegrationCost::Blocked; size]),
+            integration: Field::new(layout.width(), layout.height(), vec![IntegrationCost::default(); size]),
             heap: Heap::new(layout.width(), layout.height()),
         }
     }
@@ -52,12 +53,11 @@ impl<const AGENT: Agent> FlowField<AGENT> {
 
         let (flow, integration, heap) = (&mut self.flow, &mut self.integration, &mut self.heap);
         for (cost, flow) in integration.iter_mut().zip(flow.iter_mut()) {
-            *cost = IntegrationCost::Blocked;
+            *cost = IntegrationCost::default();
             *flow = Direction::None;
         }
 
         heap.clear();
-
         for goal in goals.into_iter() {
             if !flow.valid(goal) {
                 continue;
@@ -67,27 +67,65 @@ impl<const AGENT: Agent> FlowField<AGENT> {
             flow[goal] = Direction::None;
         }
 
+        let is_diagonal_neighbor_valid = |cell: Cell, direction: Direction| {
+            let check = |direction: Direction| {
+                let cell = cell.neighbor(direction);
+                let Some(cell) = cell else {
+                    return false;
+                };
+                obstacle_field.traversable(cell, AGENT)
+            };
+
+            match direction {
+                Direction::NorthEast => check(Direction::North) && check(Direction::East),
+                Direction::SouthEast => check(Direction::South) && check(Direction::East),
+                Direction::SouthWest => check(Direction::South) && check(Direction::West),
+                Direction::NorthWest => check(Direction::North) && check(Direction::West),
+                _ => false,
+            }
+        };
+
         let is_traversable = |cell: Cell| obstacle_field.traversable(cell, AGENT);
 
         while let Some((cell, _)) = heap.pop() {
             let mut process = |neighbor: Cell| {
-                let traversable = is_traversable(neighbor);
-                let is_goal = integration[neighbor] == IntegrationCost::Goal;
-
-                if !traversable && !is_goal {
-                    return;
+                const fn valid_transition(current: IntegrationCost, neighbor: IntegrationCost) -> bool {
+                    use IntegrationCost::*;
+                    match current {
+                        Blocked(_, _) => matches!(neighbor, Blocked(_, _) | Goal),
+                        Occupied(d, _) => {
+                            if d == GOAL_DEPTH {
+                                matches!(neighbor, Traversable(_) | Occupied(_, _) | Goal)
+                            } else {
+                                matches!(neighbor, Occupied(_, _) | Goal)
+                            }
+                        }
+                        Traversable(_) => true,
+                        Goal => true,
+                    }
                 }
 
-                let cost = if traversable {
-                    let distance = cell.manhattan(neighbor) as u16;
-                    IntegrationCost::Traversable(integration[cell].cost().saturating_add(distance))
-                } else {
+                let current: IntegrationCost = integration[cell];
+                let cost = if is_traversable(neighbor) {
+                    // Traversable
+                    let distance = cell.manhattan(neighbor) as u8;
+                    IntegrationCost::Traversable(current.cost().saturating_add(distance))
+                } else if integration[neighbor] == IntegrationCost::Goal {
+                    // Goal
                     IntegrationCost::Goal
+                } else {
+                    // Blocked or Occupied
+                    let distance = cell.manhattan(neighbor) as u8;
+                    let (depth, cost) = current.depth_and_cost();
+                    if matches!(obstacle_field.occupant(neighbor), Occupant::Agent) {
+                        IntegrationCost::Occupied(depth.saturating_add(1), cost.saturating_add(distance))
+                    } else {
+                        IntegrationCost::Blocked(depth.saturating_add(1), cost.saturating_add(distance))
+                    }
                 };
 
-                if cost < integration[neighbor] {
+                if valid_transition(current, cost) && cost < integration[neighbor] {
                     integration[neighbor] = cost;
-                    flow[neighbor] = neighbor.direction(cell);
                     if !heap.contains(neighbor) {
                         heap.push(neighbor, cost);
                     }
@@ -98,24 +136,6 @@ impl<const AGENT: Agent> FlowField<AGENT> {
                 process(neighbor);
             }
 
-            let is_diagonal_neighbor_valid = |cell: Cell, direction: Direction| {
-                let check = |direction: Direction| {
-                    let cell = cell.neighbor(direction);
-                    let Some(cell) = cell else {
-                        return false;
-                    };
-                    is_traversable(cell)
-                };
-
-                match direction {
-                    Direction::NorthEast => check(Direction::North) && check(Direction::East),
-                    Direction::SouthEast => check(Direction::South) && check(Direction::East),
-                    Direction::SouthWest => check(Direction::South) && check(Direction::West),
-                    Direction::NorthWest => check(Direction::North) && check(Direction::West),
-                    _ => false,
-                }
-            };
-
             for neighbor in
                 obstacle_field.diagonal(cell).filter(|&n| is_diagonal_neighbor_valid(cell, cell.direction(n)))
             {
@@ -123,30 +143,45 @@ impl<const AGENT: Agent> FlowField<AGENT> {
             }
         }
 
-        // obstacles
-        for (origin, footprint) in obstacles {
-            for &cell in footprint {
-                if !flow.valid(cell) || integration[cell] == IntegrationCost::Goal {
-                    continue;
-                }
-
-                let direction = (if integration[cell] == IntegrationCost::Goal {
-                    origin.as_vec2() - cell.as_vec2()
-                } else {
-                    cell.as_vec2() - origin.as_vec2()
-                })
-                .normalize_or_zero();
-
-                flow[cell] = Direction::from_vec(direction);
+        // kernel
+        let width = integration.width();
+        for i in 0..integration.len() {
+            let cell = Cell::from_index(i, width);
+            if let Some(min) = integration
+                .adjacent(cell)
+                .chain(integration.diagonal(cell).filter(|&n| is_diagonal_neighbor_valid(cell, cell.direction(n))))
+                .min_by(|a, b| integration[*a].cmp(&integration[*b]))
+            {
+                flow[cell] = cell.direction(min);
             }
         }
 
-        // field bounds
-        let center = flow.center();
-        for &cell in bounds {
-            let direction = (center.as_vec2() - cell.as_vec2()).normalize_or_zero();
-            flow[cell] = Direction::from_vec(direction);
-        }
+        // // obstacles
+        // for (origin, footprint) in obstacles {
+        //     for &cell in footprint {
+        //         if !flow.valid(cell) || flow[cell] != Direction::None {
+        //             continue;
+        //         }
+        //         if integration[cell] == IntegrationCost::Goal {
+        //             flow[cell] = Direction::from_vec(origin.as_vec2() - cell.as_vec2());
+        //             continue;
+        //         }
+        //         // TODO: we could do 2 passes here, first build a potential field from obstacle center, then flow
+        //         let min = integration
+        //             .neighbors(cell)
+        //             .min_by(|&a, &b| integration[a].cost().cmp(&integration[b].cost()))
+        //             .unwrap();
+
+        //         flow[cell] = cell.direction(min);
+        //     }
+        // }
+
+        // // field bounds
+        // let center = flow.center();
+        // for &cell in bounds {
+        //     let direction = (center.as_vec2() - cell.as_vec2()).normalize_or_zero();
+        //     flow[cell] = Direction::from_vec(direction);
+        // }
     }
 }
 
@@ -161,6 +196,7 @@ impl Heap {
     fn new(width: usize, height: usize) -> Self {
         Self { heap: BinaryHeap::new(), contains: Field::new(width, height, vec![false; width * height]) }
     }
+
     #[inline]
     fn push(&mut self, cell: Cell, cost: IntegrationCost) {
         self.heap.push(Reverse((cost, cell)));
@@ -173,10 +209,12 @@ impl Heap {
         self.contains[cell] = false;
         Some((cell, cost))
     }
+
     #[inline]
     fn contains(&self, cell: Cell) -> bool {
         self.contains[cell]
     }
+
     #[inline]
     fn clear(&mut self) {
         self.heap.clear();
@@ -186,29 +224,57 @@ impl Heap {
     }
 }
 
-#[derive(Default, Clone, Copy, Eq, Debug, Reflect)]
+pub const GOAL_DEPTH: u8 = u8::MAX;
+
+#[derive(Clone, Copy, Eq, Debug, Reflect)]
 #[repr(u16)]
 enum IntegrationCost {
-    #[default]
-    Blocked,
-    Traversable(u16),
+    /// Blocked by an obstacle, with a depth and cost
+    Blocked(u8, u8),
+    /// Occupied by an agent, with a depth and cost
+    Occupied(u8, u8),
+    Traversable(u8),
     Goal,
 }
 
-impl IntegrationCost {
+impl Default for IntegrationCost {
     #[inline]
-    pub const fn cost(&self) -> u16 {
+    fn default() -> Self {
+        Self::Blocked(GOAL_DEPTH, u8::MAX)
+    }
+}
+
+impl IntegrationCost {
+    pub const fn cost(&self) -> u8 {
+        use IntegrationCost::*;
         match self {
-            Self::Blocked => u16::MAX,
-            Self::Traversable(cost) => *cost,
-            Self::Goal => 0,
+            Blocked(d, c) => d.saturating_mul(*c),
+            Occupied(d, c) => {
+                if *d == GOAL_DEPTH {
+                    *c
+                } else {
+                    d.saturating_mul(*c)
+                }
+            }
+            Traversable(c) => *c,
+            Goal => 0,
+        }
+    }
+
+    pub const fn depth_and_cost(&self) -> (u8, u8) {
+        use IntegrationCost::*;
+        match self {
+            Blocked(d, c) => (*d, *c),
+            Occupied(d, c) => (*d, *c),
+            Traversable(c) => (0, *c),
+            Goal => (GOAL_DEPTH, 0),
         }
     }
 }
 
 impl PartialEq for IntegrationCost {
     fn eq(&self, other: &Self) -> bool {
-        self.cost() == other.cost()
+        matches!(self.cmp(other), std::cmp::Ordering::Equal)
     }
 }
 
@@ -220,7 +286,32 @@ impl PartialOrd for IntegrationCost {
 
 impl Ord for IntegrationCost {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.cost().cmp(&other.cost())
+        use IntegrationCost::*;
+        match (self, other) {
+            // Handle comparisons where both are Blocked or both are Occupied
+            (Blocked(a1, a2), Blocked(b1, b2)) | (Occupied(a1, a2), Occupied(b1, b2)) => {
+                a1.cmp(b1).then_with(|| a2.cmp(b2))
+            }
+
+            // When one is Blocked/Occupied, and the other is also Blocked/Occupied but different variants
+            (Blocked(_, _), Occupied(_, _)) => std::cmp::Ordering::Greater,
+            (Occupied(_, _), Blocked(_, _)) => std::cmp::Ordering::Less,
+
+            // Comparisons between Blocked/Occupied and other types
+            (Blocked(_, _), _) => std::cmp::Ordering::Greater,
+            (_, Blocked(_, _)) => std::cmp::Ordering::Less,
+
+            (Occupied(_, _), _) => std::cmp::Ordering::Greater,
+            (_, Occupied(_, _)) => std::cmp::Ordering::Less,
+
+            // Direct comparison for Traversable variants
+            (Traversable(a), Traversable(b)) => a.cmp(b),
+            (Traversable(_), _) => std::cmp::Ordering::Greater,
+            (_, Traversable(_)) => std::cmp::Ordering::Less,
+
+            // Goal comparisons
+            (Goal, Goal) => std::cmp::Ordering::Equal,
+        }
     }
 }
 
@@ -232,7 +323,7 @@ pub(in crate::navigation) fn build<const AGENT: Agent>(
         With<Dirty<FlowField<AGENT>>>,
     >,
     obstacle_field: Res<ObstacleField>,
-    obstacles: Query<(&ExpandedFootprint<AGENT>, &CellIndex), With<Obstacle>>,
+    obstacles: Query<(&ExpandedFootprint<AGENT>, &CellIndex), super::obstacle::ObstacleFilter>,
     bounds: Res<FieldBounds<AGENT>>,
 ) {
     flow_fields.par_iter_mut().for_each(|(entity, mut flow_field, cell_index, footprint)| {
@@ -308,13 +399,15 @@ pub(crate) fn gizmos<const AGENT: Agent>(
     layout: Res<FieldLayout>,
     flow_fields: Query<&FlowField<AGENT>>,
 ) {
+    use crate::navigation::flow_field::layout::HALF_CELL_SIZE;
+
     for flow_field in &flow_fields {
         for (cell, &direction) in flow_field.iter().enumerate().map(|(i, cost)| (layout.cell_from_index(i), cost)) {
             let position = layout.position(cell).x0y();
             if let Some(direction) = direction.as_direction2d() {
                 let start = position;
-                let end = start + direction.x0y() * (layout.cell_size() / 2.0);
-                gizmos.arrow(start + Vec3::Y * 0.1, end + Vec3::Y * 0.1, Color::WHITE);
+                let end = start + direction.x0y() * HALF_CELL_SIZE;
+                gizmos.arrow(start.y_pad(), end.y_pad(), Color::WHITE);
             }
         }
     }

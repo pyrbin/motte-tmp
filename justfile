@@ -3,10 +3,13 @@ set shell := ["nu.exe", "-c"]
 bin := "motte"
 
 watch:
-    cargo watch --features dev_tools -q -c -x 'run -- --bin $bin'
+    cargo watch --features 'dev_tools, dynamic_linking' -q -c -x 'run -- --bin $bin'
+
+dev:
+    cargo run --bin $bin --features 'dev_tools, dynamic_linking'
 
 run:
-    cargo run --bin $bin --features dev_tools
+    cargo run --bin $bin --release
 
 run-wasm:
     cargo run --bin $bin --target wasm32-unknown-unknown --features dev_tools

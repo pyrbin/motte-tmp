@@ -1,11 +1,14 @@
 use super::fields::Cell;
 use crate::{navigation::agent::Agent, prelude::*};
 
+pub const CELL_SIZE: usize = 1;
+pub const CELL_SIZE_F32: f32 = CELL_SIZE as f32;
+pub const HALF_CELL_SIZE: f32 = CELL_SIZE_F32 / 2.0;
+
 #[derive(Resource, Clone, Copy, Reflect)]
 pub struct FieldLayout {
     width: usize,
     height: usize,
-    cell_size: f32,
     offset: Vec2,
 }
 
@@ -13,28 +16,21 @@ impl Default for FieldLayout {
     fn default() -> Self {
         const WIDTH: usize = 64;
         const HEIGHT: usize = 64;
-        const CELL: f32 = 1.0;
-        Self { width: WIDTH, height: HEIGHT, cell_size: CELL, offset: centered_offset(CELL, WIDTH, HEIGHT) }
+        Self { width: WIDTH, height: HEIGHT, offset: centered_offset(WIDTH, HEIGHT) }
     }
 }
 
 impl FieldLayout {
     pub fn new(width: usize, height: usize) -> Self {
         let mut layout = Self { width, height, ..Default::default() };
-        layout.offset = centered_offset(layout.cell_size, layout.width, layout.height);
+        layout.offset = centered_offset(layout.width, layout.height);
         layout
-    }
-
-    pub fn with_cell_size(mut self, cell_size: f32) -> Self {
-        self.cell_size = cell_size;
-        self.offset = centered_offset(self.cell_size, self.width, self.height);
-        self
     }
 
     #[inline]
     pub fn cell(&self, global_position_xz: Vec2) -> Cell {
         let translation = self.transform_point(global_position_xz);
-        Cell::round((translation.x / self.cell_size(), translation.y / self.cell_size()))
+        Cell::round((translation.x / CELL_SIZE_F32, translation.y / CELL_SIZE_F32))
     }
 
     #[inline]
@@ -45,8 +41,8 @@ impl FieldLayout {
     #[inline]
     pub fn position(&self, cell: Cell) -> Vec2 {
         let offset = self.offset();
-        let world_x = cell.x() as f32 * self.cell_size() + offset.x;
-        let world_z = cell.y() as f32 * self.cell_size() + offset.y;
+        let world_x = cell.x() as f32 * CELL_SIZE_F32 + offset.x;
+        let world_z = cell.y() as f32 * CELL_SIZE_F32 + offset.y;
         Vec2::new(world_x, world_z)
     }
 
@@ -67,11 +63,6 @@ impl FieldLayout {
     #[inline]
     pub fn valid(&self, cell: Cell) -> bool {
         cell.x() < self.width && cell.y() < self.height
-    }
-
-    #[inline]
-    pub fn cell_size(&self) -> f32 {
-        self.cell_size.max(f32::EPSILON)
     }
 
     #[inline]
@@ -124,9 +115,11 @@ pub(super) fn field_bounds<const AGENT: Agent>(layout: Res<FieldLayout>, mut fie
 }
 
 #[inline]
-fn centered_offset(cell_size: f32, width: usize, height: usize) -> Vec2 {
-    let half_size = cell_size / 2.0;
-    Vec2::new(-(width as f32 / 2.0) * cell_size + half_size, -(height as f32 / 2.0) * cell_size + half_size)
+fn centered_offset(width: usize, height: usize) -> Vec2 {
+    Vec2::new(
+        -(width as f32 / 2.0) * CELL_SIZE_F32 + HALF_CELL_SIZE,
+        -(height as f32 / 2.0) * CELL_SIZE_F32 + HALF_CELL_SIZE,
+    )
 }
 
 #[cfg(feature = "dev_tools")]
@@ -134,7 +127,7 @@ pub(crate) fn gizmos(mut gizmos: Gizmos, layout: Res<FieldLayout>) {
     gizmos.rect(
         layout.center().x0y() + Vec3::Y * 0.1,
         Quat::from_rotation_x(PI / 2.),
-        Vec2::new(layout.width() as f32, layout.height() as f32) * layout.cell_size(),
+        Vec2::new(layout.width() as f32, layout.height() as f32) * CELL_SIZE_F32,
         Color::CYAN,
     );
 }

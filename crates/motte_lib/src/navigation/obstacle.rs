@@ -2,19 +2,20 @@ use bevy_xpbd_3d::parry::{
     na::{Const, OPoint},
     shape::TypedShape,
 };
+use parry2d::shape::ConvexPolygon;
 
-use crate::prelude::*;
+use crate::{navigation::agent::Agent, prelude::*};
 
 #[derive(Component, Clone, Default, Reflect)]
 #[reflect(Component)]
 pub enum Obstacle {
     #[default]
     Empty,
-    Shape(SmallVec<[Vec2; 8]>),
+    Shape(SmallVec<[Vec2; 16]>),
 }
 
 impl Obstacle {
-    pub fn is_empty(&self) -> bool {
+    pub fn empty(&self) -> bool {
         matches!(self, Obstacle::Empty)
     }
 
@@ -41,15 +42,13 @@ pub(super) fn obstacle(
     >,
 ) {
     // TODO: sample height if/whenever we have a generated height-field.
-    let plane_height = 0.0;
+    const FIELD_HEIGHT: f32 = 0.0;
     // TODO: we would need another solution to properly support varying agent heights, not a concern for now tho.
-    let max_agent_height = 1.0;
-
-    let border_expansion = 0.5;
+    const MAX_AGENT_HEIGHT: f32 = Agent::LARGEST.height() / 2.0;
 
     obstacles.par_iter_mut().for_each(|(mut obstacle, collider, aabb, global_transform)| {
-        if aabb.min.y > max_agent_height || aabb.max.y < plane_height {
-            if !obstacle.is_empty() {
+        if aabb.min.y > MAX_AGENT_HEIGHT || aabb.max.y < FIELD_HEIGHT {
+            if !obstacle.empty() {
                 *obstacle = Obstacle::Empty;
             }
             return;
@@ -82,30 +81,24 @@ pub(super) fn obstacle(
             return;
         }
 
-        // TODO: compute the convex hull more efficiently. Or at least use "barry" or 'glam-native' solution
-        let mut shape: SmallVec<[Vec2; 8]> = parry2d::transformation::convex_hull(&vertices)
-            .iter()
-            .map(|point| transform.transform_point(Vec3::new(point.x, 0.0, point.y)).xz())
-            .collect();
+        // TODO: compute the convex hull more efficiently. Or at least use a 'glam-native' solution
+        let Some(mut polygon) = ConvexPolygon::from_convex_hull(
+            &parry2d::transformation::convex_hull(&vertices)
+                .iter()
+                .map(|point| transform.transform_point(Vec3::new(point.x, 0.0, point.y)).xz().into())
+                .collect_vec(),
+        ) else {
+            *obstacle = Obstacle::Empty;
+            return;
+        };
 
-        if border_expansion > 0.0 {
-            expand_shape(&mut shape, border_expansion);
+        const BORDER_EXPANSION: f32 = 1.0;
+        if BORDER_EXPANSION > 0.0 {
+            polygon = polygon.scaled(&[BORDER_EXPANSION; 2].into()).unwrap();
         }
 
-        *obstacle = Obstacle::Shape(shape);
+        *obstacle = Obstacle::Shape(polygon.points().into_iter().map(|p| Vec2::new(p.x, p.y)).collect());
     });
-}
-
-#[inline]
-fn expand_shape(hull: &mut SmallVec<[Vec2; 8]>, expansion: f32) {
-    // perf: could probably be improved
-    let center = hull.iter().fold(Vec2::ZERO, |acc, p| acc + *p) / hull.len() as f32; // Calculate center of polygon
-    for point in hull.iter_mut() {
-        let direction = *point - center;
-        let normalized_direction = direction.normalize();
-        let expanded_point = center + normalized_direction * (direction.length() + expansion);
-        *point = expanded_point;
-    }
 }
 
 #[cfg(feature = "dev_tools")]

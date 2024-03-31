@@ -1,5 +1,6 @@
 use std::marker::ConstParamTy;
 
+use super::flow_field::{footprint::Footprint, layout::CELL_SIZE, pathing::Goal};
 use crate::{movement::motor::Movement, prelude::*};
 
 #[derive(Component, Default, Debug, ConstParamTy, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
@@ -7,10 +8,10 @@ use crate::{movement::motor::Movement, prelude::*};
 #[repr(u8)]
 pub enum Agent {
     #[default]
-    Small = 1,
-    Medium = 3,
-    Large = 5,
-    Huge = 7,
+    Small = CELL_SIZE as u8,
+    Medium = CELL_SIZE as u8 * 3,
+    Large = CELL_SIZE as u8 * 5,
+    Huge = CELL_SIZE as u8 * 7,
 }
 
 impl Agent {
@@ -24,7 +25,7 @@ impl Agent {
     pub const ALL: [Self; 4] = [Self::Huge, Self::Large, Self::Medium, Self::Small];
 
     pub const fn radius(&self) -> f32 {
-        self.size() * 0.5
+        self.size() / 2.0
     }
 
     pub const fn size(self) -> f32 {
@@ -45,14 +46,13 @@ impl std::fmt::Display for Agent {
 #[derive(Component, Default, Reflect)]
 pub struct AgentType<const AGENT: Agent>;
 
+#[derive(Component, Clone, Copy, Deref, DerefMut, Default, From, Reflect)]
+pub struct Seek(pub Option<Direction2d>);
 impl Seek {
     pub fn as_vec(&self) -> Vec2 {
         self.0.map(|d| d.xy()).unwrap_or(Vec2::ZERO)
     }
 }
-
-#[derive(Component, Clone, Copy, Deref, DerefMut, Default, From, Reflect)]
-pub struct Seek(pub Option<Direction2d>);
 
 #[derive(Component, Debug, Clone, Copy, Deref, DerefMut, Default, Reflect)]
 pub struct DesiredVelocity(Vec2);
@@ -139,6 +139,24 @@ pub(super) fn target_reached(
     });
 }
 
+pub(super) fn footprint(
+    commands: ParallelCommands,
+    idle: Query<Entity, (With<Agent>, Or<(Without<Goal>, With<TargetReached>)>, Without<Footprint>)>,
+    pathing: Query<Entity, (With<Agent>, With<Goal>, Without<TargetReached>, With<Footprint>)>,
+) {
+    idle.par_iter().for_each(|entity| {
+        commands.command_scope(|mut c| {
+            c.entity(entity).insert(Footprint::default());
+        });
+    });
+
+    pathing.par_iter().for_each(|entity| {
+        commands.command_scope(|mut c| {
+            c.entity(entity).remove::<Footprint>();
+        });
+    });
+}
+
 pub(super) fn agent_type<const AGENT: Agent>(
     commands: ParallelCommands,
     agents: Query<(Entity, &Agent), (Changed<Agent>, Without<AgentType<AGENT>>)>,
@@ -160,6 +178,8 @@ pub(super) fn agent_type<const AGENT: Agent>(
         });
     }
 }
+
+// TODO: if agent is
 
 #[cfg(feature = "dev_tools")]
 pub(crate) fn gizmos(mut gizmos: Gizmos, agents: Query<(&Agent, &GlobalTransform)>) {

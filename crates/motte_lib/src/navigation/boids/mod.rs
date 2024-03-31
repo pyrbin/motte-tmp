@@ -7,8 +7,10 @@ use super::{
 };
 use crate::{prelude::*, utils::math::determinant};
 
-#[derive(Component)]
-pub struct Boided;
+#[derive(Component, Default)]
+pub struct Boided {
+    pub is_right_side: Option<bool>,
+}
 
 pub struct Steering(Option<Direction2d>);
 pub struct Seek(Option<Direction2d>);
@@ -16,13 +18,15 @@ pub struct Avoidance(Option<Direction2d>);
 
 pub fn boid_avoidance(
     mut gizmos: Gizmos,
-    mut agents: Query<(Entity, &Agent, &GlobalTransform, &mut DesiredVelocity, &Speed), (With<Boided>)>,
+    mut agents: Query<(Entity, &Agent, &GlobalTransform, &mut DesiredVelocity, &Speed, &mut Boided)>,
     agents_kd_tree: Res<KDTree3<Agent>>,
 ) {
-    agents.iter_mut().for_each(|(entity, agent, global_transform, mut desired_velocity, speed)| {
+    agents.iter_mut().for_each(|(entity, agent, global_transform, mut desired_velocity, speed, mut boided)| {
         let neighborhood = agent.radius() + Agent::LARGEST.radius();
         let position = global_transform.translation();
         let direction = desired_velocity.normalize_or_zero();
+        let right = Vec2::new(-direction.y, direction.x);
+
         gizmos.circle(position.x0z().y_pad(), Direction3d::Y, neighborhood, Color::CYAN);
 
         let (seperation, count) = agents_kd_tree
@@ -34,7 +38,17 @@ pub fn boid_avoidance(
                 {
                     return None;
                 }
-                Some((position - *other_position).xz())
+
+                let distance = (position - *other_position).xz();
+                let is_right_side = if let Some(is_right_side) = boided.is_right_side {
+                    is_right_side
+                } else {
+                    let is_right_side = determinant(distance, right) > 0.0;
+                    boided.is_right_side = Some(is_right_side);
+                    is_right_side
+                };
+                let distance = if !is_right_side { distance - right } else { distance + right };
+                Some(distance)
             })
             .fold((Vec2::ZERO, 0), |acc, s| (acc.0 + s, acc.1 + 1));
 
@@ -44,16 +58,17 @@ pub fn boid_avoidance(
             let avg_separation = seperation / count as f32;
             avg_separation.normalize_or_zero()
         } else {
+            // boided.is_right_side = None;
             return;
         };
 
-        let direction = desired_velocity.normalize_or_zero();
+        // let direction = desired_velocity.normalize_or_zero();
 
-        let right = Vec2::new(-direction.y, direction.x);
-        let is_right_side = determinant(flocking_force, right) > 0.0;
+        // let right = Vec2::new(-direction.y, direction.x);
+        // let is_right_side = determinant(flocking_force, right) > 0.0;
 
-        // if right side, steer left, else steer right
-        flocking_force = if is_right_side { flocking_force - right } else { flocking_force + right };
+        // // if right side, steer left, else steer right
+        // flocking_force = if is_right_side { flocking_force - right } else { flocking_force + right };
 
         gizmos.arrow(position.y_pad(), (position.xz() + flocking_force).x0y().y_pad() * 5.0, Color::RED);
 

@@ -10,7 +10,7 @@ use crate::{
     graphics::pixelate,
     movement::motor::CharacterMotor,
     navigation::{
-        agent::{Agent, Speed},
+        agent::{Agent, Speed, TargetReachedCondition},
         avoidance::{
             Avoidance, AvoidanceVelocity, ContrainedTranslation, ExtrapolatedTranslation, PreConstraintTranslation,
         },
@@ -33,9 +33,7 @@ impl Plugin for InGamePlugin {
         app.add_systems(Update, click);
 
         const DEFAULT_SIZE: (usize, usize) = (16 * 8, 9 * 8);
-        const DEFAULT_CELL_SIZE: f32 = 1.0;
-
-        let layout = FieldLayout::new(DEFAULT_SIZE.0, DEFAULT_SIZE.1).with_cell_size(DEFAULT_CELL_SIZE);
+        let layout = FieldLayout::new(DEFAULT_SIZE.0, DEFAULT_SIZE.1);
         let obstacles = ObstacleField::from_layout(&layout);
 
         app.insert_resource(layout);
@@ -124,7 +122,7 @@ fn setup(
         ))
         .id();
 
-    for i in 0..0 {
+    for i in 0..15 {
         let translation = random_point_in_square(70.0);
         let radius = thread_rng().gen_range(2.0..3.0);
         let height = thread_rng().gen_range(2.0..6.0);
@@ -138,7 +136,7 @@ fn setup(
                 } else {
                     Mesh::from(Cuboid { half_size: Vec3::ONE * height })
                 }),
-                material: materials.add(Color::PURPLE),
+                material: materials.add(Color::PURPLE.with_a(0.0)),
                 transform: Vec3::new(translation.x, 0.0, translation.y).into_transform(),
                 ..default()
             },
@@ -155,10 +153,8 @@ fn setup(
             CellIndex::default(),
         ));
     }
-    const RADIUS: f32 = 1.0;
-    const HALF_RADIUS: f32 = RADIUS / 2.0;
 
-    for i in 0..10 {
+    for i in 0..15 {
         let agent = Agent::Medium; // Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
         let translation = random_point_in_square(20.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
@@ -173,25 +169,25 @@ fn setup(
                     ..default()
                 },
                 CharacterMotor::cylinder(agent.height(), agent.radius()),
-                pixelate::Snap::translation(),
+                // pixelate::Snap::translation(),
                 agent,
                 Speed::base(100.0),
                 CellIndex::default(),
                 Avoidance::new(2.0),
-                InverseMass(1.0),
+                InverseMass(11111.0),
                 ExtrapolatedTranslation::default(),
                 PreConstraintTranslation::default(),
                 ContrainedTranslation::default(),
-                AvoidanceVelocity::default(),
-                bevy_mod_picking::PickableBundle::default(),
-                #[cfg(feature = "dev_tools")]
-                bevy_transform_gizmo::GizmoTransformable,
-                // Footprint::default(),
+                TargetReachedCondition::Distance(1.0),
+                // bevy_mod_picking::PickableBundle::default(),
+                // #[cfg(feature = "dev_tools")]
+                // bevy_transform_gizmo::GizmoTransformable,
             ))
             .id();
 
-        if i == 0 {
-            commands.entity(agent).insert(Goal::Entity(target)).insert(Boided);
+        if i % 2 == 0 {
+            commands.entity(agent).insert(Goal::Entity(target)).insert(Boided::default());
+        } else {
         }
     }
 }
