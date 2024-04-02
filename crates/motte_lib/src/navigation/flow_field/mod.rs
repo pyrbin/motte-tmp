@@ -102,6 +102,7 @@ impl<const AGENT: Agent> Plugin for FlowFieldAgentPlugin<AGENT> {
                 cache::tick::<AGENT>,
                 cache::despawn::<AGENT>,
                 layout::field_bounds::<AGENT>,
+                pathing::maintain,
                 footprint::expand::<AGENT>.after(footprint::agents).after(footprint::obstacles),
             )
                 .in_set(FlowFieldSystems::Maintain),

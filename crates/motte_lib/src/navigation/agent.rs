@@ -1,7 +1,10 @@
 use std::marker::ConstParamTy;
 
 use super::flow_field::{footprint::Footprint, layout::CELL_SIZE, pathing::Goal};
-use crate::{movement::motor::Movement, prelude::*};
+use crate::{
+    movement::motor::{Movement, Stationary},
+    prelude::*,
+};
 
 #[derive(Component, Default, Debug, ConstParamTy, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[reflect(Component)]
@@ -26,15 +29,6 @@ impl Agent {
 
     pub const fn radius(&self) -> f32 {
         self.size() / 2.0
-    }
-
-    pub const fn radius_sqrt(&self) -> f32 {
-        use parry2d::na::SimdComplexField;
-        self.radius().simd_powi(2)
-    }
-
-    pub const fn neighborhood(&self) -> f32 {
-        self.radius() + Agent::LARGEST.radius()
     }
 
     pub const fn size(self) -> f32 {
@@ -83,15 +77,10 @@ pub enum TargetReachedCondition {
 impl TargetReachedCondition {
     #[inline]
     pub fn has_reached_target(&self, agent: &Agent, target_distance: f32) -> bool {
-        pub const DESTINATION_ACCURACY: f32 = 0.1;
-        pub const MAX_DESTINATION_ACCURACY: f32 = 0.5;
-
+        pub const DESTINATION_ACCURACY: f32 = 0.25;
         match self {
             TargetReachedCondition::Distance(distance) => {
-                target_distance
-                    < (agent.radius()
-                        + distance
-                        + (DESTINATION_ACCURACY * agent.radius()).max(MAX_DESTINATION_ACCURACY))
+                target_distance < (agent.radius() + distance + (DESTINATION_ACCURACY * agent.radius()))
             }
         }
     }
@@ -105,6 +94,7 @@ pub(super) fn setup(mut commands: Commands, agents: Query<Entity, Added<Agent>>)
 
 type MovingAgents = (With<Agent>, Without<TargetReached>);
 
+#[inline]
 pub(super) fn desired_velocity(
     mut agents: Query<(Option<&DesiredDirection>, &Speed, &mut DesiredVelocity), MovingAgents>,
 ) {
@@ -112,38 +102,53 @@ pub(super) fn desired_velocity(
         if let Some(desired_direction) = desired_direction
             && let Some(dir) = **desired_direction
         {
-            const KSI: f32 = 0.0385;
-            const MAGNITUDE: f32 = 100.0;
-            **desired_velocity = ((1.0 - KSI) * **desired_velocity + KSI * (dir.xy() * **speed)) * MAGNITUDE;
+            **desired_velocity = dir.xy() * speed.value(); // (desired_velocity.lerp(velocity,
+                                                           // KSI)).clamp_length_max(speed.value());
+        } else {
+            desired_velocity.reset();
         }
     });
 }
 
-pub(super) fn apply_velocity(mut agents: Query<(&mut DesiredVelocity, &mut Movement), MovingAgents>) {
-    agents.par_iter_mut().for_each(|(mut desired_velocity, mut movement)| {
+pub(super) fn apply_velocity(mut agents: Query<(&DesiredVelocity, &mut Movement), MovingAgents>) {
+    agents.par_iter_mut().for_each(|(desired_velocity, mut movement)| {
         if desired_velocity.is_approx_zero() {
-            desired_velocity.reset();
             return;
         }
-
         **movement = **desired_velocity;
-        desired_velocity.reset();
     });
 }
 
 pub(super) fn target_reached(
     commands: ParallelCommands,
     mut agents: Query<
-        (Entity, &Agent, &DesiredDirection, &TargetDistance, &TargetReachedCondition, Has<TargetReached>),
+        (
+            Entity,
+            &Agent,
+            &DesiredDirection,
+            &TargetDistance,
+            &mut DesiredVelocity,
+            &TargetReachedCondition,
+            Has<TargetReached>,
+        ),
         With<Agent>,
     >,
 ) {
     agents.par_iter_mut().for_each(
-        |(entity, agent, desired_direction, distance, target_reached_condition, target_reached)| {
+        |(
+            entity,
+            agent,
+            desired_direction,
+            distance,
+            mut desired_velocity,
+            target_reached_condition,
+            target_reached,
+        )| {
             commands.command_scope(|mut c| {
                 if desired_direction.is_some() && target_reached_condition.has_reached_target(agent, **distance) {
                     if !target_reached {
                         c.entity(entity).insert(TargetReached);
+                        desired_velocity.reset();
                     }
                 } else if target_reached {
                     c.entity(entity).remove::<TargetReached>();
@@ -155,11 +160,8 @@ pub(super) fn target_reached(
 
 pub(super) fn blocking(
     commands: ParallelCommands,
-    blocking: Query<
-        Entity,
-        (With<Agent>, Or<(Without<Goal>, With<TargetReached>)>, Or<(Without<Blocking>, Without<Footprint>)>),
-    >,
-    pathing: Query<Entity, (With<Agent>, With<Goal>, Without<TargetReached>, Or<(With<Blocking>, With<Footprint>)>)>,
+    blocking: Query<Entity, (With<Agent>, Or<(Without<Goal>, With<TargetReached>)>, Without<Blocking>)>,
+    pathing: Query<Entity, (With<Agent>, With<Goal>, Without<TargetReached>, With<Blocking>)>,
 ) {
     blocking.par_iter().for_each(|entity| {
         commands.command_scope(|mut c| {

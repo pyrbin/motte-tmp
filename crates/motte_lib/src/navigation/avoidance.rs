@@ -11,8 +11,8 @@ use std::borrow::Cow;
 
 use bevy_spatial::{kdtree::KDTree3, SpatialAccess};
 
-use super::agent::{Agent, Blocking, DesiredVelocity, Speed};
-use crate::prelude::*;
+use super::agent::{Agent, Blocking, DesiredVelocity, TargetDistance};
+use crate::{navigation::obstacle::Obstacle, prelude::*};
 
 #[derive(Component, Debug, Deref, DerefMut, Clone)]
 pub(crate) struct DodgyAgent(Cow<'static, dodgy_2d::Agent>);
@@ -22,24 +22,27 @@ impl Default for DodgyAgent {
             position: Vec2::ZERO,
             velocity: Vec2::ZERO,
             radius: Agent::SMALLEST.radius(),
-            avoidance_responsibility: 1.0,
+            avoidance_responsibility: f32::EPSILON,
         }))
     }
 }
 
-pub(super) fn dodgy(
-    mut agents: Query<(Entity, &Agent, &DodgyAgent, &mut DesiredVelocity, &Speed), (With<Agent>, Without<Blocking>)>,
+pub(super) fn rvo2(
+    mut agents: Query<(Entity, &Agent, &DodgyAgent, &mut DesiredVelocity), (With<Agent>, Without<Blocking>)>,
     other_agents: Query<&DodgyAgent>,
     agents_kd_tree: Res<KDTree3<Agent>>,
+    obstacles: Query<&Obstacle>,
     time: Res<Time>,
 ) {
     let delta_time = time.delta_seconds();
-    agents.par_iter_mut().for_each(|(entity, agent, dodgy_agent, mut desired_velocity, speed)| {
+    agents.par_iter_mut().for_each(|(entity, agent, dodgy_agent, mut desired_velocity)| {
         const RADIUS_PADDING: f32 = 1.0;
+        const fn neighborhood(agent: &Agent) -> f32 {
+            agent.radius() + Agent::LARGEST.radius() + RADIUS_PADDING
+        }
 
-        let neighborhood = agent.neighborhood() + RADIUS_PADDING;
+        let neighborhood = neighborhood(agent);
         let position = dodgy_agent.0.position;
-
         let neighbors: SmallVec<[Cow<'static, dodgy_2d::Agent>; 16]> = agents_kd_tree
             .within_distance(position.x0y(), neighborhood)
             .iter()
@@ -47,17 +50,32 @@ pub(super) fn dodgy(
                 other.filter(|&other| other != entity).and_then(|other| other_agents.get(other).ok())
             })
             .filter(|other| other.0.position.distance(position) <= (agent.radius() + RADIUS_PADDING + other.0.radius))
+            // TODO: maybe only include neighbors in front??
             .map(|other| other.0.clone())
             .collect();
 
+        // TODO: try having blocking agents as obstacles?
+        let obstacles: Vec<Cow<'static, dodgy_2d::Obstacle>> = obstacles
+            .iter()
+            .filter_map(|obstacle| {
+                if let Obstacle::Shape(vertices) = obstacle {
+                    return Some(Cow::Owned(dodgy_2d::Obstacle::Closed { vertices: vertices.clone().into_vec() }));
+                } else {
+                    return None;
+                }
+            })
+            .collect::<Vec<_>>();
+
         const AVOIDANCE_OPTIONS: dodgy_2d::AvoidanceOptions =
-            dodgy_2d::AvoidanceOptions { obstacle_margin: 0.1, time_horizon: 2.0, obstacle_time_horizon: 0.1 };
+            dodgy_2d::AvoidanceOptions { obstacle_margin: 0.1, time_horizon: 3.0, obstacle_time_horizon: 0.1 };
+
+        const MAX_SPEED_MULTIPLIER: f32 = 1.2;
 
         **desired_velocity = dodgy_agent.compute_avoiding_velocity(
             &neighbors,
-            &[], // Leaving this empty for now, some reason velocity becomes very slow when obstacles are present.
+            &obstacles,
             **desired_velocity,
-            speed.value(),
+            MAX_SPEED_MULTIPLIER * desired_velocity.length(),
             delta_time,
             &AVOIDANCE_OPTIONS,
         );
@@ -76,18 +94,33 @@ type DodgyAgentNeedsSync =
     Or<(Added<DodgyAgent>, Changed<Agent>, Added<Blocking>, Changed<DesiredVelocity>, Changed<GlobalTransform>)>;
 
 pub(super) fn sync(
-    mut agents: Query<(&mut DodgyAgent, &Agent, &GlobalTransform, &LinearVelocity, Has<Blocking>), DodgyAgentNeedsSync>,
+    mut agents: Query<
+        (&mut DodgyAgent, &Agent, &GlobalTransform, &LinearVelocity, Has<Blocking>, &TargetDistance),
+        DodgyAgentNeedsSync,
+    >,
 ) {
-    agents.par_iter_mut().for_each(|(mut dodgy_agent, agent, global_transform, velocity, is_blocking)| {
-        let dodgy_agent = dodgy_agent.0.to_mut();
-        dodgy_agent.position = global_transform.translation().xz();
-        dodgy_agent.velocity = velocity.xy();
-        dodgy_agent.radius = agent.radius();
-        const RESPONSIBILITY_FACTOR: f32 = 100.0;
-        // TODO: smaller agents should have a larger responsibility ?
-        dodgy_agent.avoidance_responsibility =
-            if is_blocking { f32::EPSILON } else { agent.size() * RESPONSIBILITY_FACTOR };
-    });
+    agents.par_iter_mut().for_each(
+        |(mut dodgy_agent, agent, global_transform, velocity, is_blocking, target_distance)| {
+            let dodgy_agent = dodgy_agent.0.to_mut();
+            dodgy_agent.position = global_transform.translation().xz();
+            dodgy_agent.velocity = velocity.xy();
+
+            const RADIUS_PADDING: f32 = 0.1;
+            dodgy_agent.radius = agent.radius() + RADIUS_PADDING;
+
+            const fn calculate_avoidance_priority(agent: &Agent, distance: f32) -> f32 {
+                use parry2d::na::SimdPartialOrd;
+                const MAX_RANGE: f32 = 1000.0;
+                let clamped_distance = distance.simd_clamp(0.0, MAX_RANGE);
+                let size_priority = (Agent::LARGEST.size() + 1.0) - agent.size() as f32;
+                let avoidance_priority = MAX_RANGE * size_priority + clamped_distance;
+                avoidance_priority * avoidance_priority
+            }
+
+            dodgy_agent.avoidance_responsibility =
+                if is_blocking { f32::EPSILON } else { calculate_avoidance_priority(agent, **target_distance) };
+        },
+    );
 }
 
 pub(super) fn cleanup(mut commands: Commands, mut removed: RemovedComponents<Agent>) {
@@ -103,6 +136,5 @@ pub(crate) fn gizmos(mut gizmos: Gizmos, agents: Query<(&Agent, &DodgyAgent)>) {
     for (agent, dodgy_agent) in &agents {
         let position = dodgy_agent.0.position;
         gizmos.circle(position.x0y().y_pad(), Direction3d::Y, dodgy_agent.radius + 0.1, Color::PURPLE);
-        gizmos.circle(position.x0y().y_pad(), Direction3d::Y, agent.neighborhood(), Color::BLUE);
     }
 }

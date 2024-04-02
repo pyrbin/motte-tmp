@@ -12,7 +12,7 @@ run:
     cargo run --bin $bin --release
 
 run-wasm:
-    cargo run --bin $bin --target wasm32-unknown-unknown --features dev_tools
+    cargo run --bin $bin --target wasm32-unknown-unknown --features 'dev_tools'
 
 build:
     cargo build --bin $bin --release
@@ -21,7 +21,7 @@ build-wasm:
     cargo build --bin $bin --profile wasm --target wasm32-unknown-unknown
 
 build-debug:
-    cargo build --bin $bin --features dev_tools
+    cargo build --bin $bin --features 'dev_tools'
 
 fix:
 	just clippy

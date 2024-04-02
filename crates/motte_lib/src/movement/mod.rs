@@ -1,3 +1,5 @@
+use bevy_xpbd_3d::{SubstepSchedule, SubstepSet};
+
 use self::motor::{DampingFactor, Jump, JumpHeight, MaxSlopeAngle, Movement};
 use crate::{
     active_duration::{active_duration, ActiveDuration},
@@ -42,8 +44,10 @@ impl Plugin for MovementPlugin {
 
         app.add_systems(
             FixedUpdate,
-            (motor::jumping, (motor::movement, motor::damping).chain()).in_set(MovementSystems::Motor),
+            (motor::jumping, (motor::gravity, motor::movement, motor::damping).chain()).in_set(MovementSystems::Motor),
         );
+
+        app.add_systems(SubstepSchedule, motor::collisions.in_set(SubstepSet::SolveUserConstraints));
 
         app.add_systems(
             FixedUpdate,

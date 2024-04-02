@@ -81,7 +81,7 @@ pub(super) fn obstacle(
             *obstacle = Obstacle::Empty;
             return;
         }
-
+        // TODO: FIX SCALING AND COLLIDER AABB
         // TODO: compute the convex hull more efficiently. Or at least use a 'glam-native' solution
         let Some(mut polygon) = ConvexPolygon::from_convex_hull(
             &parry2d::transformation::convex_hull(&vertices)
@@ -93,7 +93,7 @@ pub(super) fn obstacle(
             return;
         };
 
-        const BORDER_EXPANSION: f32 = 1.0;
+        const BORDER_EXPANSION: f32 = 1.15;
         if BORDER_EXPANSION > 0.0 {
             polygon = polygon.scaled(&[BORDER_EXPANSION; 2].into()).unwrap();
         }

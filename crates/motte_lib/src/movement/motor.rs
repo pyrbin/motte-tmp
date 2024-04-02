@@ -21,7 +21,11 @@ impl CharacterMotor {
             ground_caster: ShapeCaster::new(caster_shape, Vector::ZERO, Quaternion::default(), Direction3d::NEG_Y),
             collision_layers: CollisionLayers::new(
                 [CollisionLayer::Units],
-                [CollisionLayer::Player, CollisionLayer::Units, CollisionLayer::Terrain, CollisionLayer::Sensor],
+                [
+                    CollisionLayer::Player, // ,CollisionLayer::Units
+                    CollisionLayer::Terrain,
+                    CollisionLayer::Sensor,
+                ],
             ),
             character_motor: default(),
         }
@@ -78,10 +82,10 @@ pub struct Stationary;
 pub struct Moving;
 
 pub(super) fn movement(time: Res<Time>, mut motors: Query<(&mut Movement, &mut LinearVelocity), With<CharacterMotor>>) {
-    let dt = time.delta_seconds();
+    let delta_time: f32 = time.delta_seconds();
     motors.par_iter_mut().for_each(|(mut movement, mut linvel)| {
-        linvel.x += movement.x * dt;
-        linvel.z += movement.y * dt;
+        linvel.x += movement.x * delta_time;
+        linvel.z += movement.y * delta_time;
         movement.reset();
     });
 }
@@ -91,6 +95,79 @@ pub(super) fn damping(mut motors: Query<(&DampingFactor, &mut LinearVelocity)>) 
         linvel.x *= damping.0;
         linvel.z *= damping.0;
     });
+}
+
+pub(super) fn gravity(
+    time: Res<Time>,
+    gravity: Res<Gravity>,
+    mut motors: Query<(&mut LinearVelocity, &mut Position), With<CharacterMotor>>,
+) {
+    let delta_time: f32 = time.delta_seconds();
+    motors.par_iter_mut().for_each(|(mut linear_velocity, mut pos)| {
+        if pos.y > 0.0 {
+            linear_velocity.0 += gravity.0 * delta_time;
+        }
+        pos.y = pos.y.max(0.0);
+    });
+}
+
+pub(super) fn collisions(
+    collisions: Res<Collisions>,
+    collider_parents: Query<&ColliderParent, Without<Sensor>>,
+    mut character_controllers: Query<
+        (&RigidBody, &mut Position, &Rotation, &mut LinearVelocity, Option<&MaxSlopeAngle>),
+        With<CharacterMotor>,
+    >,
+) {
+    // Iterate through collisions and move the kinematic body to resolve penetration
+    for contacts in collisions.iter() {
+        // If the collision didn't happen during this substep, skip the collision
+        if !contacts.during_current_substep {
+            continue;
+        }
+
+        // Get the rigid body entities of the colliders (colliders could be children)
+        let Ok([collider_parent1, collider_parent2]) = collider_parents.get_many([contacts.entity1, contacts.entity2])
+        else {
+            continue;
+        };
+
+        // Get the body of the character controller and whether it is the first
+        // or second entity in the collision.
+        let is_first: bool;
+        let (rb, mut position, rotation, mut linear_velocity, max_slope_angle) =
+            if let Ok(character) = character_controllers.get_mut(collider_parent1.get()) {
+                is_first = true;
+                character
+            } else if let Ok(character) = character_controllers.get_mut(collider_parent2.get()) {
+                is_first = false;
+                character
+            } else {
+                continue;
+            };
+
+        // This system only handles collision response for kinematic character controllers
+        if !rb.is_kinematic() {
+            continue;
+        }
+
+        // Iterate through contact manifolds and their contacts.
+        // Each contact in a single manifold shares the same contact normal.
+        for manifold in contacts.manifolds.iter() {
+            let normal = if is_first { -manifold.global_normal1(rotation) } else { -manifold.global_normal2(rotation) };
+            // Solve each penetrating contact in the manifold
+            for contact in manifold.contacts.iter().filter(|c| c.penetration > 0.0) {
+                position.0 += normal * contact.penetration;
+            }
+            // If the slope isn't too steep to walk on but the character
+            // is falling, reset vertical velocity.
+            if max_slope_angle.is_some_and(|angle| normal.angle_between(Vector::Y).abs() <= angle.0)
+                && linear_velocity.y < 0.0
+            {
+                linear_velocity.y = linear_velocity.y.max(0.0);
+            }
+        }
+    }
 }
 
 pub(super) fn jumping(

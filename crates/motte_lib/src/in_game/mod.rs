@@ -16,6 +16,7 @@ use crate::{
         },
         obstacle::Obstacle,
     },
+    physics::CollisionLayer,
     player::camera::MainCamera,
     prelude::*,
     utils::math::random_point_in_square,
@@ -144,6 +145,7 @@ fn setup(
                 Collider::from(Cuboid { half_size: Vec3::ONE * height })
             },
             pixelate::Snap::translation(),
+            CollisionLayers::new([CollisionLayer::Terrain], [CollisionLayer::Terrain, CollisionLayer::Units]),
             RigidBody::Static,
             LinearVelocity::ZERO,
             Obstacle::default(),

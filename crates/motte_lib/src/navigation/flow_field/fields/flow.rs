@@ -18,25 +18,18 @@ use crate::{
 
 #[derive(Component, Default, Reflect)]
 pub struct FlowField<const AGENT: Agent> {
-    flow: Field<Direction>,
+    flow: Field<Flow>,
     #[reflect(ignore)]
     integration: Field<IntegrationCost>,
     #[reflect(ignore)]
     heap: Heap,
 }
 
-impl<const AGENT: Agent> std::ops::Deref for FlowField<AGENT> {
-    type Target = Field<Direction>;
-    fn deref(&self) -> &Self::Target {
-        &self.flow
-    }
-}
-
 impl<const AGENT: Agent> FlowField<AGENT> {
     pub fn from_layout(layout: &FieldLayout) -> Self {
         let len: usize = layout.len();
         Self {
-            flow: Field::new(layout.width(), layout.height(), vec![Direction::None; len]),
+            flow: Field::new(layout.width(), layout.height(), vec![Flow::default(); len]),
             integration: Field::new(layout.width(), layout.height(), vec![IntegrationCost::default(); len]),
             heap: Heap::new(layout.width(), layout.height()),
         }
@@ -49,7 +42,7 @@ impl<const AGENT: Agent> FlowField<AGENT> {
         let (flow, integration, heap) = (&mut self.flow, &mut self.integration, &mut self.heap);
         for (cost, flow) in integration.iter_mut().zip(flow.iter_mut()) {
             *cost = IntegrationCost::default();
-            *flow = Direction::None;
+            *flow = Flow::default();
         }
 
         heap.clear();
@@ -60,7 +53,7 @@ impl<const AGENT: Agent> FlowField<AGENT> {
             }
             heap.push(goal, IntegrationCost::Goal);
             integration[goal] = IntegrationCost::Goal;
-            flow[goal] = Direction::None;
+            flow[goal] = Flow::default();
         }
 
         let is_traversable = |cell: Cell| obstacle_field.traversable(cell, AGENT);
@@ -132,9 +125,21 @@ impl<const AGENT: Agent> FlowField<AGENT> {
                 .filter(|&n| cost.valid_flow_candidate(integration[n]))
                 .min_by(|a, b| integration[*a].cmp(&integration[*b]))
             {
-                flow[cell] = cell.direction(min);
+                flow[cell] = match cost {
+                    IntegrationCost::Blocked(_, _) | IntegrationCost::Occupied(_, _) => {
+                        Flow::Repulse(cell.direction(min))
+                    }
+                    IntegrationCost::Goal | IntegrationCost::Traversable(_) => Flow::Toward(cell.direction(min)),
+                }
             }
         }
+    }
+}
+
+impl<const AGENT: Agent> std::ops::Deref for FlowField<AGENT> {
+    type Target = Field<Flow>;
+    fn deref(&self) -> &Self::Target {
+        &self.flow
     }
 }
 
@@ -177,6 +182,37 @@ impl Heap {
         for cell in self.contains.iter_mut() {
             *cell = false;
         }
+    }
+}
+
+#[derive(Component, Clone, Copy, Default, Reflect)]
+#[repr(u8)]
+pub enum Flow {
+    // A direction towards the goal.
+    Toward(super::Direction),
+    // A direction that's a result of repulsion from an obstacle / occupied cell.
+    Repulse(super::Direction),
+    #[default]
+    None,
+}
+
+impl Flow {
+    #[inline]
+    pub const fn direction(self) -> super::Direction {
+        match self {
+            Self::Toward(direction) | Self::Repulse(direction) => direction,
+            _ => Direction::None,
+        }
+    }
+
+    #[inline]
+    pub const fn is_repulse(self) -> bool {
+        matches!(self, Self::Repulse(_))
+    }
+
+    #[inline]
+    pub const fn is_toward(self) -> bool {
+        matches!(self, Self::Toward(_))
     }
 }
 
@@ -246,7 +282,7 @@ impl IntegrationCost {
             Blocked(_, _) => true,
             Occupied(_, _) => !matches!(neighbor, Blocked(_, _)),
             Traversable(_) => matches!(neighbor, Traversable(_) | Goal),
-            Goal => true,
+            Goal => matches!(neighbor, Goal),
         }
     }
 
@@ -372,12 +408,12 @@ pub(crate) fn gizmos<const AGENT: Agent>(
     use crate::navigation::flow_field::layout::HALF_CELL_SIZE;
 
     for flow_field in &flow_fields {
-        for (cell, &direction) in flow_field.iter().enumerate().map(|(i, cost)| (layout.cell_from_index(i), cost)) {
+        for (cell, &flow) in flow_field.iter().enumerate().map(|(i, cost)| (layout.cell_from_index(i), cost)) {
             let position = layout.position(cell).x0y();
-            if let Some(direction) = direction.as_direction2d() {
+            if let Some(direction) = flow.direction().as_direction2d() {
                 let start = position;
                 let end = start + direction.x0y() * HALF_CELL_SIZE;
-                gizmos.arrow(start.y_pad(), end.y_pad(), Color::WHITE);
+                gizmos.arrow(start.y_pad(), end.y_pad(), if flow.is_repulse() { Color::RED } else { Color::WHITE });
             }
         }
     }

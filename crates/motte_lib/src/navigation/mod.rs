@@ -63,7 +63,7 @@ impl Plugin for NavigationPlugin {
             FixedUpdate,
             (
                 (obstacle::obstacle, agent::blocking, avoidance::sync).in_set(NavigationSystems::Maintain),
-                (avoidance::dodgy).in_set(NavigationSystems::Avoidance),
+                (avoidance::rvo2).in_set(NavigationSystems::Avoidance),
                 (agent::desired_velocity).in_set(NavigationSystems::Velocity),
                 (agent::apply_velocity).in_set(NavigationSystems::ApplyVelocity),
             ),
