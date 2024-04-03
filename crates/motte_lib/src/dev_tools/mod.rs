@@ -88,14 +88,14 @@ pub struct DebugLayers {
 impl Default for DebugLayers {
     fn default() -> Self {
         Self {
-            debug_cell_index: true,
+            debug_cell_index: false,
             debug_agents: false,
             debug_avoidance: false,
             debug_obstacles: false,
-            debug_footprints: true,
+            debug_footprints: false,
             debug_obstacle_field: AgentDebugLayer::Disabled,
-            debug_flow_field: AgentDebugLayer::Medium,
-            debug_field_layout: true,
+            debug_flow_field: AgentDebugLayer::Disabled,
+            debug_field_layout: false,
             debug_physics: false,
         }
     }

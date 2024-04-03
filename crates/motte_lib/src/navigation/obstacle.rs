@@ -5,7 +5,10 @@ use bevy_xpbd_3d::parry::{
 use parry2d::shape::ConvexPolygon;
 
 use super::flow_field::CellIndex;
-use crate::{navigation::agent::Agent, prelude::*};
+use crate::{
+    navigation::{agent::Agent, flow_field::layout::HALF_CELL_SIZE},
+    prelude::*,
+};
 
 #[derive(Component, Clone, Default, Reflect)]
 #[reflect(Component)]
@@ -16,10 +19,11 @@ pub enum Obstacle {
 }
 
 impl Obstacle {
-    pub fn empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         matches!(self, Obstacle::Empty)
     }
 
+    #[inline]
     pub fn line_segments(&self) -> Option<SmallVec<[(Vec2, Vec2); 4]>> {
         let Obstacle::Shape(shape) = self else {
             return None;
@@ -33,6 +37,14 @@ impl Obstacle {
         segments.push((shape[shape.len() - 1], shape[0]));
 
         Some(segments)
+    }
+
+    #[inline]
+    pub fn try_into_dodgy(&self) -> Option<dodgy_2d::Obstacle> {
+        let Obstacle::Shape(shape) = self else {
+            return None;
+        };
+        Some(dodgy_2d::Obstacle::Closed { vertices: shape.clone().into_vec() })
     }
 }
 
@@ -49,7 +61,7 @@ pub(super) fn obstacle(
 
     obstacles.par_iter_mut().for_each(|(mut obstacle, collider, aabb, global_transform)| {
         if aabb.min.y > MAX_AGENT_HEIGHT || aabb.max.y < FIELD_HEIGHT {
-            if !obstacle.empty() {
+            if !obstacle.is_empty() {
                 *obstacle = Obstacle::Empty;
             }
             return;
@@ -81,24 +93,25 @@ pub(super) fn obstacle(
             *obstacle = Obstacle::Empty;
             return;
         }
-        // TODO: FIX SCALING AND COLLIDER AABB
-        // TODO: compute the convex hull more efficiently. Or at least use a 'glam-native' solution
-        let Some(mut polygon) = ConvexPolygon::from_convex_hull(
-            &parry2d::transformation::convex_hull(&vertices)
-                .iter()
-                .map(|point| transform.transform_point(Vec3::new(point.x, 0.0, point.y)).xz().into())
-                .collect_vec(),
-        ) else {
+
+        let Some(mut polygon) = ConvexPolygon::from_convex_hull(&parry2d::transformation::convex_hull(&vertices))
+        else {
             *obstacle = Obstacle::Empty;
             return;
         };
 
-        const BORDER_EXPANSION: f32 = 1.15;
-        if BORDER_EXPANSION > 0.0 {
-            polygon = polygon.scaled(&[BORDER_EXPANSION; 2].into()).unwrap();
+        const BORDER_PADDING: f32 = HALF_CELL_SIZE;
+        if BORDER_PADDING > 0.0 {
+            polygon = polygon.offsetted(BORDER_PADDING.into());
         }
 
-        *obstacle = Obstacle::Shape(polygon.points().iter().map(|p| Vec2::new(p.x, p.y)).collect());
+        *obstacle = Obstacle::Shape(
+            polygon
+                .points()
+                .iter()
+                .map(|point| transform.transform_point(Vec3::new(point.x, 0.0, point.y)).xz())
+                .collect(),
+        );
     });
 }
 

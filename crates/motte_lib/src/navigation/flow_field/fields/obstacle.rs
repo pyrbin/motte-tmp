@@ -97,7 +97,6 @@ pub type ObstacleFilter = Or<((With<Obstacle>, With<Footprint>), (With<Agent>, W
 
 #[inline]
 pub(in crate::navigation) fn clear(mut obstacle_field: ResMut<ObstacleField>) {
-    info!(target: "obstacle_field", "clear");
     obstacle_field.clear();
 }
 
@@ -130,12 +129,10 @@ const fn expanded_traversable(agent: Agent) -> Cost {
     }
 }
 
-pub type ObstacleFilterChanged = (ObstacleFilter, Or<(Changed<Footprint>, Added<Footprint>)>);
-
-pub(in crate::navigation) fn changes(
-    obstacles: Query<Entity, ObstacleFilterChanged>,
+pub(in crate::navigation) fn changes<const AGENT: Agent>(
+    obstacles: Query<Entity, Or<(Changed<ExpandedFootprint<AGENT>>, Added<ExpandedFootprint<AGENT>>)>>,
     mut event: EventWriter<DirtyObstacleField>,
-    removed: RemovedComponents<Footprint>,
+    removed: RemovedComponents<ExpandedFootprint<AGENT>>,
 ) {
     if !obstacles.is_empty() || !removed.is_empty() {
         event.send(DirtyObstacleField);

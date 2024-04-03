@@ -11,6 +11,7 @@
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(anonymous_lifetime_in_impl_trait)]
 #![feature(inherent_associated_types)]
+#![feature(const_for)]
 
 mod app_state;
 mod asset_management;

@@ -10,7 +10,7 @@ use crate::{
                 obstacle::{DirtyObstacleField, ObstacleField},
             },
             footprint::ExpandedFootprint,
-            layout::FieldBounds,
+            layout::{FieldBorders, FieldBounds},
         },
     },
     prelude::*,
@@ -54,16 +54,14 @@ impl Plugin for FlowFieldPlugin {
                 .run_if(in_state(AppState::InGame)),
         );
 
+        app.insert_resource(FieldBorders::default());
         app.add_event::<DirtyObstacleField>();
 
         app.add_systems(
             FixedUpdate,
-            (cell_index, (footprint::agents, footprint::obstacles)).chain().in_set(FlowFieldSystems::Maintain),
-        );
-
-        app.add_systems(
-            FixedUpdate,
-            (apply_deferred, fields::obstacle::changes).chain().in_set(FlowFieldSystems::DetectChanges),
+            (cell_index, layout::field_borders, (footprint::agents, footprint::obstacles))
+                .chain()
+                .in_set(FlowFieldSystems::Maintain),
         );
 
         app.add_systems(
@@ -103,9 +101,16 @@ impl<const AGENT: Agent> Plugin for FlowFieldAgentPlugin<AGENT> {
                 cache::despawn::<AGENT>,
                 layout::field_bounds::<AGENT>,
                 pathing::maintain,
-                footprint::expand::<AGENT>.after(footprint::agents).after(footprint::obstacles),
+                footprint::expand::<AGENT>
+                    .after(footprint::agents)
+                    .after(footprint::obstacles)
+                    .before(fields::obstacle::changes::<AGENT>),
             )
                 .in_set(FlowFieldSystems::Maintain),
+        );
+        app.add_systems(
+            FixedUpdate,
+            (apply_deferred, fields::obstacle::changes::<AGENT>).chain().in_set(FlowFieldSystems::DetectChanges),
         );
         app.add_systems(
             FixedUpdate,

@@ -1,3 +1,5 @@
+use bevy::math::bounding::Aabb2d;
+
 use super::fields::{self, Cell};
 use crate::{navigation::agent::Agent, prelude::*};
 
@@ -104,6 +106,24 @@ impl FieldLayout {
 
         top_bottom.chain(left_right)
     }
+
+    #[inline]
+    pub fn aabb(&self) -> ((f32, f32), (f32, f32)) {
+        let min = ((-(self.width() as f32) / 2.0) * CELL_SIZE_F32, (-(self.height() as f32) / 2.0) * CELL_SIZE_F32);
+        let max = ((self.width() as f32 / 2.0) * CELL_SIZE_F32, (self.height() as f32 / 2.0) * CELL_SIZE_F32);
+        (min, max)
+    }
+}
+
+#[derive(Resource, Default, Deref, DerefMut, Reflect)]
+pub struct FieldBorders([Vec2; 4]);
+
+pub(super) fn field_borders(layout: Res<FieldLayout>, mut field_borders: ResMut<FieldBorders>) {
+    if layout.is_changed() || layout.len() != 0 && field_borders.0.is_empty() {
+        let (min, max) = layout.aabb();
+        **field_borders =
+            [Vec2::new(min.0, min.1), Vec2::new(max.0, min.1), Vec2::new(max.0, max.1), Vec2::new(min.0, max.1)]
+    }
 }
 
 #[derive(Resource, Default, Deref, DerefMut, Reflect)]
@@ -132,4 +152,9 @@ pub(crate) fn gizmos(mut gizmos: Gizmos, layout: Res<FieldLayout>) {
         Vec2::new(layout.width() as f32, layout.height() as f32) * CELL_SIZE_F32,
         Color::CYAN,
     );
+    let (min, max) = layout.aabb();
+    gizmos.circle(Vec2::new(min.0, min.1).x0y().y_pad(), Direction3d::Y, CELL_SIZE_F32, Color::CYAN);
+    gizmos.circle(Vec2::new(max.0, max.1).x0y().y_pad(), Direction3d::Y, CELL_SIZE_F32, Color::CYAN);
+    gizmos.circle(Vec2::new(min.0, max.1).x0y().y_pad(), Direction3d::Y, CELL_SIZE_F32, Color::CYAN);
+    gizmos.circle(Vec2::new(max.0, min.1).x0y().y_pad(), Direction3d::Y, CELL_SIZE_F32, Color::CYAN);
 }

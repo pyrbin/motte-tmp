@@ -10,7 +10,7 @@ pub(crate) use bevy::{
     math::*,
     prelude::*,
     reflect::{GetTypeRegistration, TypePath},
-    utils::{intern::Interned, Duration, HashMap, HashSet, Instant},
+    utils::{intern::Interned, petgraph::matrix_graph::Zero, Duration, HashMap, HashSet, Instant},
 };
 pub(crate) use bevy_xpbd_3d::{math::*, prelude::*};
 pub(crate) use derive_more::From;

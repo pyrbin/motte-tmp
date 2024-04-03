@@ -75,6 +75,8 @@ impl<const AGENT: Agent> FlowField<AGENT> {
             }
         };
 
+        // FIXME: bug if goal is surrounded by agents, but some traversable cells in between, the flow will cant be
+        // traversed.
         while let Some((cell, _)) = heap.pop() {
             let mut process = |neighbor: Cell| {
                 let current: IntegrationCost = integration[cell];
@@ -352,13 +354,7 @@ pub(in crate::navigation) fn build<const AGENT: Agent>(
             _ => return,
         };
 
-        let now = std::time::Instant::now();
-
         flow_field.build(goals.into_iter(), &obstacle_field);
-
-        let end = std::time::Instant::now() - now;
-
-        info!(target: "flow_field", "{:?}::build: {:?}", AGENT, end);
 
         commands.command_scope(|mut c| {
             c.entity(entity).remove::<Dirty<FlowField<AGENT>>>();
@@ -413,7 +409,14 @@ pub(crate) fn gizmos<const AGENT: Agent>(
             if let Some(direction) = flow.direction().as_direction2d() {
                 let start = position;
                 let end = start + direction.x0y() * HALF_CELL_SIZE;
-                gizmos.arrow(start.y_pad(), end.y_pad(), if flow.is_repulse() { Color::RED } else { Color::WHITE });
+                let color = match flow_field.integration[cell] {
+                    IntegrationCost::Blocked(_, _) => Color::RED,
+                    IntegrationCost::Occupied(_, _) => Color::ORANGE,
+                    IntegrationCost::Traversable(_) => Color::GRAY,
+                    IntegrationCost::Goal => Color::GREEN,
+                };
+
+                gizmos.arrow(start.y_pad(), end.y_pad(), color);
             }
         }
     }

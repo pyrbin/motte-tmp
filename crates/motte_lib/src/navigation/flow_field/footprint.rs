@@ -4,7 +4,11 @@ use super::{
     CellIndex,
 };
 use crate::{
-    navigation::{agent::Agent, flow_field::fields, obstacle::Obstacle},
+    navigation::{
+        agent::Agent,
+        flow_field::{fields, layout::CELL_SIZE_F32},
+        obstacle::Obstacle,
+    },
     prelude::*,
     utils::math::point_in_poly2d,
 };
@@ -67,12 +71,15 @@ pub(super) fn agents(
             }
         }
         CellIndex::Valid(center, _) => {
-            let layout = *layout;
-            const BORDER_PADDING: f32 = HALF_CELL_SIZE;
-
+            let layout: FieldLayout = *layout;
             let agent_radius: f32 = agent.radius();
-            let agent_radius_sqrt = agent_radius * agent_radius;
+            const fn radius_sqrt(agent: &Agent) -> f32 {
+                agent.radius() * agent.radius()
+            }
             let agent_position = global_transform.translation().xz();
+
+            const BORDER_PADDING: f32 = HALF_CELL_SIZE * 0.5;
+            const BORDER_PADDING_SQRT: f32 = BORDER_PADDING * BORDER_PADDING;
 
             let min_cell = layout.cell(Vec2::new(
                 agent_position.x - (agent_radius + BORDER_PADDING),
@@ -87,7 +94,7 @@ pub(super) fn agents(
                 (min_cell.x()..=max_cell.x())
                     .step_by(CELL_SIZE.into())
                     .flat_map(|x| (min_cell.y()..=max_cell.y()).step_by(CELL_SIZE.into()).map(move |y| Cell::new(x, y)))
-                    .filter(|&cell| center.euclidean_sqrt(cell) <= agent_radius_sqrt)
+                    .filter(|&cell| center.euclidean_sqrt(cell) <= radius_sqrt(agent) + BORDER_PADDING_SQRT)
                     .collect(),
             );
         }
@@ -106,8 +113,9 @@ pub(super) fn obstacles(
             return;
         };
 
-        let min_cell = layout.cell(aabb.min.xz());
-        let max_cell = layout.cell(aabb.max.xz());
+        const BORDER_PADDING: f32 = HALF_CELL_SIZE;
+        let min_cell = layout.cell(aabb.min.xz() + BORDER_PADDING);
+        let max_cell = layout.cell(aabb.max.xz() + BORDER_PADDING);
 
         *footprint = Footprint::Cells(
             (min_cell.x()..=max_cell.x())
@@ -130,7 +138,7 @@ pub enum ExpandedFootprint<const AGENT: Agent> {
 
 pub(super) fn setup<const AGENT: Agent>(
     commands: ParallelCommands,
-    agents: Query<Entity, Added<Footprint>>,
+    agents: Query<Entity, (With<Footprint>, Without<ExpandedFootprint<AGENT>>)>,
     mut removed: RemovedComponents<ExpandedFootprint<AGENT>>,
 ) {
     agents.par_iter().for_each(|entity| {

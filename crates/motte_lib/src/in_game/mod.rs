@@ -29,7 +29,7 @@ impl Plugin for InGamePlugin {
         app.add_systems(OnEnter(AppState::InGame), setup);
         app.add_systems(Update, click);
 
-        const DEFAULT_SIZE: (u8, u8) = (16 * 8, 9 * 8);
+        const DEFAULT_SIZE: (u8, u8) = (150, 150);
 
         let layout = FieldLayout::new(DEFAULT_SIZE.0, DEFAULT_SIZE.1);
         let obstacles = ObstacleField::from_layout(&layout);
@@ -56,7 +56,7 @@ fn setup(
     });
 
     // Plane
-    let plane_size = 200.0;
+    let plane_size = 150.0;
     let _half_plane_size = plane_size / 2.0;
 
     let mut mesh_plane = Mesh::from(Plane3d::default().mesh().size(plane_size, plane_size));
@@ -110,7 +110,7 @@ fn setup(
                 transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
                 ..default()
             },
-            Collider::from(Sphere::new(3.0)),
+            Collider::from(Sphere::new(10.0)),
             RigidBody::Static,
             Position::default(),
             Footprint::default(),
@@ -120,7 +120,7 @@ fn setup(
         ))
         .id();
 
-    for i in 0..15 {
+    for i in 0..0 {
         let translation = random_point_in_square(70.0);
         let radius = thread_rng().gen_range(2.0..3.0);
         let height = thread_rng().gen_range(2.0..6.0);
@@ -168,7 +168,7 @@ fn setup(
                     ..default()
                 },
                 CharacterMotor::cylinder(agent.height(), agent.radius()),
-                // pixelate::Snap::translation(),
+                pixelate::Snap::translation(),
                 agent,
                 Speed::base(100.0),
                 CellIndex::default(),
@@ -176,9 +176,7 @@ fn setup(
             ))
             .id();
 
-        if i % 2 == 0 {
-            commands.entity(agent).insert(Goal::Entity(target));
-        }
+        commands.entity(agent).insert(Goal::Entity(target));
     }
 }
 
