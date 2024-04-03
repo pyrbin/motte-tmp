@@ -38,7 +38,7 @@ fn setup(mut commands: Commands, _asset_server: Res<AssetServer>) {
             NormalPrepass,
             camera::RigTransform::default(),
             camera::Zoom::with_zoom(80.0),
-            camera::YawPitch::with_yaw_pitch(0.0, -90.0),
+            camera::YawPitch::with_yaw_pitch(0.0, -55.0),
             camera::Smoothing::default().with_position(0.0).with_rotation(2.0).with_zoom(0.0),
             pixelate::Pixelate::PixelsPerUnit(4),
             pixelate::SnapTransforms::On,

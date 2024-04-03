@@ -48,6 +48,9 @@ pub struct GlbAssets {
 
     #[asset(path = "glb/ramp.glb#Scene0")]
     pub ramp: Handle<Scene>,
+
+    #[asset(path = "glb/crystal.glb#Scene0")]
+    pub crystal: Handle<Scene>,
 }
 
 #[derive(AssetCollection, Resource, Default, Reflect)]

@@ -1,11 +1,11 @@
-use bevy::prelude::{App, Msaa, Plugin};
+use bevy::prelude::{App, Plugin};
 
+pub mod materials;
 pub mod pixelate;
-pub struct GraphicsPlugin;
 
+pub struct GraphicsPlugin;
 impl Plugin for GraphicsPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(Msaa::Off);
-        app.add_plugins((pixelate::PixelatePlugin,));
+        app.add_plugins((pixelate::PixelatePlugin, materials::MaterialsPlugin));
     }
 }

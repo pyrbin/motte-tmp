@@ -6,7 +6,7 @@ use bevy::render::{
 use self::cursor::{CursorClick, CursorPosition};
 use crate::{
     app_state::AppState,
-    asset_management::ImageAssets,
+    asset_management::{GlbAssets, ImageAssets},
     graphics::pixelate,
     movement::motor::CharacterMotor,
     navigation::{
@@ -47,6 +47,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     image_assets: Res<ImageAssets>,
+    glb_assets: Res<GlbAssets>,
     mut asset_image: ResMut<Assets<Image>>,
 ) {
     commands.spawn(DirectionalLightBundle {
@@ -104,13 +105,12 @@ fn setup(
     let target = commands
         .spawn((
             Name::new("target"),
-            PbrBundle {
-                mesh: meshes.add(Sphere::new(3.0).mesh().ico(5).unwrap()),
-                material: materials.add(Color::BLUE.with_a(0.33)),
+            SceneBundle {
+                scene: glb_assets.crystal.clone(),
                 transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
-                ..default()
+                ..Default::default()
             },
-            Collider::from(Sphere::new(10.0)),
+            Collider::from(Sphere::new(3.0)),
             RigidBody::Static,
             Position::default(),
             Footprint::default(),
@@ -120,7 +120,7 @@ fn setup(
         ))
         .id();
 
-    for i in 0..0 {
+    for i in 0..5 {
         let translation = random_point_in_square(70.0);
         let radius = thread_rng().gen_range(2.0..3.0);
         let height = thread_rng().gen_range(2.0..6.0);
@@ -134,7 +134,7 @@ fn setup(
                 } else {
                     Mesh::from(Cuboid { half_size: Vec3::ONE * height })
                 }),
-                material: materials.add(Color::PURPLE.with_a(0.0)),
+                material: materials.add(Color::BEIGE.with_a(0.5)),
                 transform: Vec3::new(translation.x, 0.0, translation.y).into_transform(),
                 ..default()
             },
@@ -153,8 +153,8 @@ fn setup(
         ));
     }
 
-    for i in 0..1 {
-        let agent = Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
+    for i in 0..10 {
+        let agent = Agent::Medium; // Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
         let translation = random_point_in_square(50.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
         let agent = commands
@@ -163,7 +163,7 @@ fn setup(
                 PbrBundle {
                     mesh: meshes
                         .add(Mesh::from(Cylinder { radius: agent.radius(), half_height: agent.height() / 2.0 })),
-                    material: materials.add(Color::GREEN.with_a(0.75)),
+                    material: materials.add(Color::RED),
                     transform,
                     ..default()
                 },

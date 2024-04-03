@@ -82,6 +82,7 @@ impl Plugin for PixelatePlugin {
             UniformComponentPlugin::<ScaleBias>::default(),
         ));
 
+        app.insert_resource(Msaa::Off);
         app.init_resource::<MainSnapTransformsCamera>();
 
         app.add_systems(
