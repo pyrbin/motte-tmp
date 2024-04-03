@@ -30,13 +30,8 @@ impl Default for DodgyAgent {
     }
 }
 
-#[derive(Component, Debug, Deref, DerefMut, Clone)]
+#[derive(Component, Debug, Deref, DerefMut, Clone, Default)]
 pub(crate) struct DodgyObstacle(Option<Cow<'static, dodgy_2d::Obstacle>>);
-impl Default for DodgyObstacle {
-    fn default() -> Self {
-        Self(None)
-    }
-}
 
 pub(super) fn rvo2(
     mut agents: Query<(Entity, &Agent, &DodgyAgent, &mut DesiredVelocity)>,
@@ -52,7 +47,7 @@ pub(super) fn rvo2(
     let mut obstacles: Vec<Cow<'static, dodgy_2d::Obstacle>> =
         obstacles.iter().filter_map(|obstacle| obstacle.0.clone()).collect::<Vec<_>>();
 
-    obstacles.push(Cow::Owned(dodgy_2d::Obstacle::Open { vertices: field_borders.clone().into() }));
+    obstacles.push(Cow::Owned(dodgy_2d::Obstacle::Open { vertices: (**field_borders).into() }));
 
     agents.par_iter_mut().for_each(|(entity, agent, dodgy_agent, mut desired_velocity)| {
         const fn neighborhood(agent: &Agent) -> f32 {
@@ -132,7 +127,7 @@ pub(super) fn sync_agents(
                 use parry2d::na::SimdPartialOrd;
                 const MAX_RANGE: f32 = 1000.0;
                 let clamped_distance = distance.simd_clamp(0.0, MAX_RANGE);
-                let size_priority = (Agent::LARGEST.size() + 1.0) - agent.size() as f32;
+                let size_priority = (Agent::LARGEST.size() + 1.0) - agent.size();
                 let avoidance_priority = MAX_RANGE * size_priority + clamped_distance;
                 avoidance_priority * avoidance_priority
             }

@@ -91,7 +91,7 @@ impl PerfUiEntry for PerfUiEntryRenderResolution {
             Err(QuerySingleError::MultipleEntities(_)) => None,
             _ => None,
         };
-        render_resolution.map(|a| a.0)
+        render_resolution.map(|a| a.value())
     }
 
     fn format_value(&self, value: &Self::Value) -> String {

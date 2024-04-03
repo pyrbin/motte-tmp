@@ -12,6 +12,7 @@
 #![feature(anonymous_lifetime_in_impl_trait)]
 #![feature(inherent_associated_types)]
 #![feature(const_for)]
+#![feature(const_mut_refs)]
 
 mod app_state;
 mod asset_management;

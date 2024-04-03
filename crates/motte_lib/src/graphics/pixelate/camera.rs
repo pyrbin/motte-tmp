@@ -61,7 +61,7 @@ impl Pixelate {
     /// [`bevy::render::camera::ScalingMode::FixedVertical`] projection is required for
     /// [`Pixelate::PixelsPerUnit`] variant.
     #[inline]
-    pub(crate) fn render_resolution(
+    pub(super) fn render_resolution(
         &self,
         window_resolution: UVec2,
         orthographic_fixed_height: Option<&OrthographicFixedVertical>,
@@ -112,15 +112,8 @@ pub enum SubPixelSmoothing {
     Off,
 }
 
-impl SubPixelSmoothing {
-    pub fn is_on(&self) -> bool {
-        matches!(self, Self::On)
-    }
-}
-
 /// Disables or enables snapping logic for transforms with [`Snap`] for this camera (excluding the actual camera).
 /// !!! It's assumed only one [`SnapTransforms::On`] camera is active at a time.
-// TODO: want a better name for this. Or restructure how Pixelate/Snap feature components API.
 #[derive(Component, Reflect, Clone, Copy, Debug, Default)]
 #[reflect(Component)]
 pub enum SnapTransforms {
@@ -128,6 +121,11 @@ pub enum SnapTransforms {
     On,
     Off,
 }
+
+/// Main camera with active [`SnapTransforms`] component.
+#[derive(Resource, Reflect, Default, Clone, Copy, Debug, Deref, DerefMut)]
+#[reflect(Resource)]
+pub struct MainSnapTransformsCamera(Option<Entity>);
 
 /// Handle to the texture that the camera renders to.
 #[derive(Component, Reflect, Clone, Debug, Default, PartialEq, Eq, ExtractComponent)]
@@ -148,7 +146,7 @@ impl RenderTexture {
             _ => None,
         }
     }
-    pub(crate) fn set_handle(&mut self, handle: Handle<Image>) {
+    pub(super) fn set_handle(&mut self, handle: Handle<Image>) {
         *self = Self::Texture(handle);
     }
 }
@@ -157,9 +155,9 @@ impl RenderTexture {
 /// [`OrthographicProjection`] & [`bevy::render::camera::ScalingMode::FixedVertical`] scaling mode.
 #[derive(Component, Reflect, Clone, Copy, Debug, Default)]
 #[reflect(Component)]
-pub(crate) struct OrthographicFixedVertical {
-    pub(crate) height: f32,
-    pub(crate) scale: f32,
+pub(super) struct OrthographicFixedVertical {
+    pub(super) height: f32,
+    pub(super) scale: f32,
 }
 
 /// Creates a new [`OrthographicProjection`] with [ScalingMode::FixedVertical].
@@ -171,12 +169,7 @@ pub fn orthographic_fixed_vertical(height: f32, scale: f32, near: f32, far: f32)
 /// Used in [`ScaleBias`] when blitting the texture to the [`Blitter`].
 #[derive(Component, Reflect, Clone, Copy, Debug, Deref, DerefMut, Default)]
 #[reflect(Component)]
-pub struct SnapOffset(pub(crate) Vec3A);
-impl SnapOffset {
-    pub fn offset(&self) -> Vec3A {
-        self.0
-    }
-}
+pub struct SnapOffset(pub(super) Vec3A);
 
 /// Units per pixel for [`Pixelate`] camera. This is only available for cameras with an
 /// [`OrthographicProjection`] & [`bevy::render::camera::ScalingMode::FixedVertical`] scaling mode.
@@ -189,29 +182,18 @@ pub enum UnitsPerPixel {
 }
 
 impl UnitsPerPixel {
-    pub fn get_value(&self) -> Option<f32> {
+    pub fn value(&self) -> Option<f32> {
         match self {
             Self::Value(value) => Some(*value),
             _ => None,
-        }
-    }
-    pub fn value(&self) -> f32 {
-        match self {
-            Self::Value(value) => *value,
-            _ => panic!("UnitsPerPixel is unavailable."),
-        }
-    }
-    pub fn value_or(&self, default: f32) -> f32 {
-        match self {
-            Self::Value(value) => *value,
-            _ => default,
         }
     }
 }
 
 #[derive(Component, Reflect, Clone, Copy, Debug, Deref, DerefMut, Default)]
 #[reflect(Component)]
-pub struct RenderResolution(pub(crate) UVec2);
+pub struct RenderResolution(UVec2);
+
 impl RenderResolution {
     pub fn value(&self) -> UVec2 {
         self.0
@@ -230,25 +212,25 @@ pub struct Blitter(pub Option<Entity>);
 #[derive(Component, Reflect, Clone, Copy, Debug, Default, ShaderType, ExtractComponent)]
 #[extract_component_filter((With<Camera2d>, With<Camera>))]
 #[reflect(Component)]
-pub(crate) struct ScaleBias {
+pub(super) struct ScaleBias {
     pub scale: Vec2,
     pub bias: Vec2,
 }
 
 impl ScaleBias {
     #[allow(unused)]
-    pub(crate) fn new(scale: Vec2, bias: Vec2) -> Self {
+    pub(super) fn new(scale: Vec2, bias: Vec2) -> Self {
         Self { scale, bias }
     }
     /// Creates a new [`ScaleBias`] with the given bias & a scale of [`Vec2::ONE`].
-    pub(crate) fn with_bias(bias: Vec2) -> Self {
+    pub(super) fn with_bias(bias: Vec2) -> Self {
         Self { scale: Vec2::ONE, bias }
     }
 }
 
 /// Sets the [`OrthographicFixedVertical`] component for all [`Pixelate`] cameras with an
 /// [`OrthographicProjection`] and [`ScalingMode::FixedVertical`] scaling mode.
-pub(crate) fn sync_orthographic_fixed_height(
+pub(super) fn orthographic_fixed_height(
     mut commands: Commands,
     mut cameras: Query<(Entity, &mut Projection), (With<Camera3d>, Changed<Projection>)>,
 ) {
@@ -270,7 +252,7 @@ pub(crate) fn sync_orthographic_fixed_height(
 }
 
 /// Initializes required components for all [`Pixelate`] cameras when they are added.
-pub(crate) fn pixelate_added(mut commands: Commands, cameras: Query<Entity, Added<Pixelate>>) {
+pub(super) fn setup(mut commands: Commands, cameras: Query<Entity, Added<Pixelate>>) {
     for camera in cameras.iter() {
         commands
             .entity(camera)
@@ -280,8 +262,33 @@ pub(crate) fn pixelate_added(mut commands: Commands, cameras: Query<Entity, Adde
     }
 }
 
+/// Inserts the main camera into [`MainSnapTransformsCamera`].
+pub(super) fn main_camera(
+    mut main_snap_transforms_camera: ResMut<MainSnapTransformsCamera>,
+    cameras: Query<
+        (Entity, &SnapTransforms),
+        (With<OrthographicFixedVertical>, With<super::camera::Pixelate>, With<SnapTransforms>, With<UnitsPerPixel>),
+    >,
+) {
+    let valid_cameras: Vec<_> =
+        cameras.iter().filter(|(_, snap_transforms)| matches!(snap_transforms, SnapTransforms::On)).collect();
+
+    debug_assert!(
+        valid_cameras.len() <= 1,
+        "Found more than one camera with SnapTransforms::On, {} cameras found.",
+        valid_cameras.len()
+    );
+
+    let Some((entity, _)) = valid_cameras.first() else {
+        **main_snap_transforms_camera = None;
+        return;
+    };
+
+    **main_snap_transforms_camera = Some(*entity);
+}
+
 /// Initializes and/or resizes the render textures of all [`Pixelate`]s if any changes are detected.
-pub(crate) fn pixelate_render_texture(
+pub(super) fn render_texture(
     mut cameras: Query<(
         Entity,
         &mut Camera,
@@ -389,7 +396,7 @@ pub(crate) fn pixelate_render_texture(
     }
 }
 
-pub(crate) fn sync_blitter_camera(
+pub(super) fn blitter(
     mut commands: Commands,
     mut cameras: Query<
         (
@@ -403,13 +410,12 @@ pub(crate) fn sync_blitter_camera(
         ),
         (With<Pixelate>, Without<Blitter>),
     >,
-    mut blit_cameras: Query<
+    mut blitters: Query<
         (Entity, &Blitter, &Camera, Option<&mut ScaleBias>, Option<&mut RenderTexture>),
         (Without<Pixelate>, With<Camera2d>),
     >,
-    _images: ResMut<Assets<Image>>,
 ) {
-    for (entity, blitter, camera, scale_bias, render_texture) in &mut blit_cameras {
+    for (entity, blitter, camera, scale_bias, render_texture) in &mut blitters {
         let Some(pixelate_camera) = **blitter else {
             continue;
         };
@@ -450,7 +456,7 @@ pub(crate) fn sync_blitter_camera(
             && matches!(sub_pixel_smoothing, SubPixelSmoothing::On)
             && let Some(&snap_offset) = snap_offset
             && let Some(units_per_pixel) = units_per_pixel
-            && let Some(units_per_pixel) = units_per_pixel.get_value()
+            && let Some(units_per_pixel) = units_per_pixel.value()
         {
             let mut bias = snap_offset.xy() / units_per_pixel;
             // displacement in relation to render resolution.

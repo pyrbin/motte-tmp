@@ -1,10 +1,7 @@
 use std::marker::ConstParamTy;
 
 use super::flow_field::{footprint::Footprint, layout::CELL_SIZE, pathing::Goal};
-use crate::{
-    movement::motor::{Movement, Stationary},
-    prelude::*,
-};
+use crate::{movement::motor::Movement, prelude::*};
 
 #[derive(Component, Default, Debug, ConstParamTy, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[reflect(Component)]

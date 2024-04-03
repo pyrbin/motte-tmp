@@ -1,5 +1,3 @@
-use bevy::math::bounding::Aabb2d;
-
 use super::fields::{self, Cell};
 use crate::{navigation::agent::Agent, prelude::*};
 

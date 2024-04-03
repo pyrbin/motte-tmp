@@ -102,7 +102,7 @@ pub(super) fn obstacle(
 
         const BORDER_PADDING: f32 = HALF_CELL_SIZE;
         if BORDER_PADDING > 0.0 {
-            polygon = polygon.offsetted(BORDER_PADDING.into());
+            polygon = polygon.offsetted(BORDER_PADDING);
         }
 
         *obstacle = Obstacle::Shape(

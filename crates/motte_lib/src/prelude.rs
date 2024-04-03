@@ -7,7 +7,7 @@ pub(crate) use anyhow::{anyhow, bail, ensure, Context, Error as AnyError, Result
 pub(crate) use bevy::{
     ecs::{query::QueryData, schedule::ScheduleLabel},
     log::*,
-    math::*,
+    math::{Vec3Swizzles, *},
     prelude::*,
     reflect::{GetTypeRegistration, TypePath},
     utils::{intern::Interned, petgraph::matrix_graph::Zero, Duration, HashMap, HashSet, Instant},

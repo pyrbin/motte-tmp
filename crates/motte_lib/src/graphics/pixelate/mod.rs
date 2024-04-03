@@ -14,11 +14,11 @@ mod node;
 mod pipeline;
 mod snap;
 
+use bevy_xpbd_3d::PhysicsSet;
 pub use camera::*;
 use node::PixelateNode;
 use pipeline::PixelatePipeline;
-use snap::*;
-pub use snap::{Snap, SnappedTranslation};
+pub use snap::{Snap, SnappedTransform};
 
 pub(crate) mod constants {
     use bevy::prelude::UVec2;
@@ -29,9 +29,11 @@ pub(crate) mod constants {
 
 /// Set for the systems related to snapping transforms & cameras.
 #[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum SnapSystem {
-    Transforms,
+pub enum SnapSystems {
+    Revert,
     Camera,
+    Transforms,
+    Apply,
 }
 
 const SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(6669923404675166368);
@@ -55,15 +57,22 @@ impl Plugin for PixelatePlugin {
             .register_type::<RenderTexture>()
             .register_type::<Blitter>()
             .register_type::<Snap>()
-            .register_type::<SnappedTranslation>();
+            .register_type::<SnappedTransform>();
 
         use bevy::{render::camera::CameraUpdateSystem, transform::TransformSystem};
+
+        app.configure_sets(First, SnapSystems::Revert.run_if(snap_transforms_camera_active));
         app.configure_sets(
             PostUpdate,
-            (SnapSystem::Camera, SnapSystem::Transforms)
+            (SnapSystems::Camera, SnapSystems::Transforms.run_if(snap_transforms_camera_active))
                 .chain()
                 .after(TransformSystem::TransformPropagate)
+                .after(PhysicsSet::Sync)
                 .before(CameraUpdateSystem),
+        );
+        app.configure_sets(
+            Last,
+            SnapSystems::Apply.run_if(snap_transforms_camera_active).after(SnapSystems::Transforms),
         );
 
         app.add_plugins((
@@ -73,19 +82,24 @@ impl Plugin for PixelatePlugin {
             UniformComponentPlugin::<ScaleBias>::default(),
         ));
 
+        app.init_resource::<MainSnapTransformsCamera>();
+
         app.add_systems(
             Update,
-            (pixelate_added, sync_orthographic_fixed_height, apply_deferred, pixelate_render_texture).chain(),
+            (camera::setup, camera::orthographic_fixed_height, apply_deferred, camera::render_texture).chain(),
         );
 
-        app.add_systems(Update, (add_snapped_translation).chain().before(SnapSystem::Transforms));
+        app.add_systems(First, (snap::revert.run_if(snap_transforms_camera_active)).in_set(SnapSystems::Revert));
+
+        app.add_systems(Update, (snap::setup, camera::main_camera).chain().before(SnapSystems::Camera));
 
         app.add_systems(
             PostUpdate,
-            (snap_camera.in_set(SnapSystem::Camera), snap_transforms.in_set(SnapSystem::Transforms)),
+            (snap::camera.in_set(SnapSystems::Camera), snap::transforms.in_set(SnapSystems::Transforms)),
         );
 
-        app.add_systems(Last, sync_blitter_camera.after(SnapSystem::Camera));
+        app.add_systems(Last, camera::blitter.after(SnapSystems::Camera).before(SnapSystems::Apply));
+        app.add_systems(Last, snap::apply.in_set(SnapSystems::Apply));
 
         let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
@@ -106,4 +120,8 @@ impl Plugin for PixelatePlugin {
 
         render_app.init_resource::<PixelatePipeline>();
     }
+}
+
+pub fn snap_transforms_camera_active(cam: Option<Res<MainSnapTransformsCamera>>) -> bool {
+    cam.map(|cam| cam.is_some()).unwrap_or(false)
 }

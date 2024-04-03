@@ -153,7 +153,7 @@ fn setup(
         ));
     }
 
-    for i in 0..30 {
+    for i in 0..1 {
         let agent = Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
         let translation = random_point_in_square(50.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();

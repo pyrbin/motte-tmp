@@ -4,11 +4,7 @@ use super::{
     CellIndex,
 };
 use crate::{
-    navigation::{
-        agent::Agent,
-        flow_field::{fields, layout::CELL_SIZE_F32},
-        obstacle::Obstacle,
-    },
+    navigation::{agent::Agent, flow_field::fields, obstacle::Obstacle},
     prelude::*,
     utils::math::point_in_poly2d,
 };
