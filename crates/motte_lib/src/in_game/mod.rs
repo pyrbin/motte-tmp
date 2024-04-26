@@ -50,11 +50,14 @@ fn setup(
     glb_assets: Res<GlbAssets>,
     mut asset_image: ResMut<Assets<Image>>,
 ) {
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight { illuminance: 5000.0, color: Color::WHITE, ..default() },
-        transform: Transform::from_xyz(30., 100., 30.).looking_at(Vec3::ZERO, Vec3::Y),
-        ..default()
-    });
+    commands.spawn((
+        Name::light("sun"),
+        DirectionalLightBundle {
+            directional_light: DirectionalLight { illuminance: 5000.0, color: Color::WHITE, ..default() },
+            transform: Transform::from_xyz(30., 100., 30.).looking_at(Vec3::ZERO, Vec3::Y),
+            ..default()
+        },
+    ));
 
     // Plane
     let plane_size = 150.0;
@@ -90,7 +93,7 @@ fn setup(
     };
 
     commands.spawn((
-        Name::new("plane"),
+        Name::unit("plane"),
         PbrBundle {
             mesh: meshes.add(mesh_plane),
             material: materials.add(StandardMaterial { base_color_texture: Some(panel), unlit: true, ..default() }),
@@ -104,15 +107,21 @@ fn setup(
 
     let target = commands
         .spawn((
-            Name::new("target"),
-            SceneBundle {
-                scene: glb_assets.crystal.clone(),
-                transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
-                ..Default::default()
+            Name::unit("target"),
+            // SceneBundle {
+            //     scene: glb_assets.crystal.clone(),
+            //     transform: (Vec3::ZERO + Vec3::NEG_Y * 2.5).into_transform(),
+            //     ..Default::default()
+            // },
+            PbrBundle {
+                mesh: meshes.add(Mesh::from(Sphere::new(3.0))),
+                material: materials.add(Color::GREEN),
+                transform: (Vec3::ZERO + Vec3::Y * 3.0).into_transform(),
+                ..default()
             },
+            pixelate::Snap::translation(),
             Collider::from(Sphere::new(3.0)),
             RigidBody::Static,
-            Position::default(),
             Footprint::default(),
             Obstacle::default(),
             CellIndex::default(),
@@ -134,7 +143,7 @@ fn setup(
                 } else {
                     Mesh::from(Cuboid { half_size: Vec3::ONE * height })
                 }),
-                material: materials.add(Color::BEIGE.with_a(0.5)),
+                material: materials.add(Color::BEIGE),
                 transform: Vec3::new(translation.x, 0.0, translation.y).into_transform(),
                 ..default()
             },
@@ -153,7 +162,7 @@ fn setup(
         ));
     }
 
-    for i in 0..10 {
+    for i in 0..5 {
         let agent = Agent::Medium; // Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
         let translation = random_point_in_square(50.0);
         let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
@@ -195,7 +204,7 @@ fn click(
             let (camera, camera_transform) = main_cam.get_single().expect("there should be a main camera");
             let (origin, direction) = math::world_space_ray_from_ndc(cursor.ndc(), camera, camera_transform);
             let position = math::plane_intersection(origin, direction, Vec3::ZERO, Vec3::Y);
-            transform.translation = position;
+            transform.translation = position + Vec3::Y * 3.0;
         }
     }
 }

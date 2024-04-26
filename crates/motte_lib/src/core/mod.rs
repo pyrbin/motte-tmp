@@ -25,27 +25,32 @@ impl Plugin for CorePlugin {
     }
 }
 
-mod domain_names {
+mod name_tags {
     pub const UI: &str = ":ui";
     pub const UNIT: &str = ":unit";
     pub const CAMERA: &str = ":camera";
+    pub const LIGHT: &str = ":light";
 }
 
-pub trait NameExt {
+pub trait NameTags {
     fn ui(name: impl Into<Cow<'static, str>>) -> Name {
-        Name::new(format!("{} {}", domain_names::UI, name.into()))
+        Name::new(format!("{} {}", name_tags::UI, name.into()))
+    }
+
+    fn light(name: impl Into<Cow<'static, str>>) -> Name {
+        Name::new(format!("{} {}", name_tags::LIGHT, name.into()))
     }
 
     fn unit(name: impl Into<Cow<'static, str>>) -> Name {
-        Name::new(format!("{} {}", domain_names::UNIT, name.into()))
+        Name::new(format!("{} {}", name_tags::UNIT, name.into()))
     }
 
     fn camera(name: impl Into<Cow<'static, str>>) -> Name {
-        Name::new(format!("{} {}", domain_names::CAMERA, name.into()))
+        Name::new(format!("{} {}", name_tags::CAMERA, name.into()))
     }
 }
 
-impl NameExt for Name {}
+impl NameTags for Name {}
 
 #[derive(Component, Reflect, Debug, Clone, Copy, PartialEq, Eq, Hash, Deref, DerefMut, From)]
 pub struct Owner(pub Entity);

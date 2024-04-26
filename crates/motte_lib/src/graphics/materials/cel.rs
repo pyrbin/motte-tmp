@@ -10,11 +10,11 @@ pub type CelMaterial = ExtendedMaterial<StandardMaterial, CelExtension>;
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
 pub struct CelExtension {
     #[uniform(100)]
-    pub luminance_bands: f32,
+    pub lit: f32,
     #[uniform(100)]
-    pub luminance_power: f32,
+    pub shadow: f32,
     #[uniform(100)]
-    pub dither_factor: f32,
+    pub cut_off: f32,
 }
 
 impl MaterialExtension for CelExtension {
@@ -29,6 +29,6 @@ impl MaterialExtension for CelExtension {
 
 impl Default for CelExtension {
     fn default() -> Self {
-        Self { luminance_bands: 8.0, luminance_power: 2.0, dither_factor: 0.0 }
+        Self { lit: 1.0, shadow: 0.5, cut_off: 0.5 }
     }
 }

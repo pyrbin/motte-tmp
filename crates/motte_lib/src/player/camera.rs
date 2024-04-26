@@ -1,6 +1,7 @@
 use bevy::{
     core_pipeline::prepass::{DepthPrepass, NormalPrepass},
     input::mouse::MouseWheel,
+    pbr::ShadowFilteringMethod,
 };
 
 use crate::{graphics::pixelate, prelude::*};
@@ -36,6 +37,7 @@ fn setup(mut commands: Commands, _asset_server: Res<AssetServer>) {
             },
             DepthPrepass,
             NormalPrepass,
+            ShadowFilteringMethod::Hardware2x2,
             camera::RigTransform::default(),
             camera::Zoom::with_zoom(80.0),
             camera::YawPitch::with_yaw_pitch(0.0, -55.0),

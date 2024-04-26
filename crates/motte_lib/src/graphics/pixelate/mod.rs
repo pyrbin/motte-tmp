@@ -1,6 +1,7 @@
 use bevy::{
     asset::load_internal_asset,
     core_pipeline::core_2d::graph::{Core2d, Node2d},
+    pbr::ShadowFilteringMethod,
     prelude::*,
     render::{
         extract_component::{ExtractComponentPlugin, UniformComponentPlugin},
