@@ -25,4 +25,3 @@ rustflags = [
 
 [profile.dev]
 debug = 1 # Following improves compile times, but reduces the amount of debug info to 'line number tables only'. In most cases the gains are negligible.
-codegen-backend = "cranelift"

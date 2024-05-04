@@ -20,7 +20,7 @@ impl Plugin for MaterialsPlugin {
 
         app.add_plugins(MaterialPlugin::<CelMaterial>::default()).register_asset_reflect::<CelMaterial>();
 
-        // app.add_systems(PostUpdate, replace_shaders);
+        app.add_systems(PostUpdate, replace_shaders);
     }
 }
 
