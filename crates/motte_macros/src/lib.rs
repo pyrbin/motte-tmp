@@ -16,7 +16,7 @@ pub fn app_register_types(input: TokenStream) -> TokenStream {
 
 /// Derive macro generating an impl of the trait `Stat`.
 #[proc_macro_error]
-#[proc_macro_derive(Stat)]
+#[proc_macro_derive(Stat, attributes(stat))]
 pub fn stat_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     crate::stat::impl_stat_derive(&ast)

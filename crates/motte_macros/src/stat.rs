@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
-use proc_macro2::Span;
+use proc_macro2::{Ident, Span};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
-use syn::{DeriveInput, Ident};
+use syn::{DeriveInput, Fields};
 
 const CRATE_IDENT: &str = "motte_lib";
 
@@ -18,54 +18,73 @@ pub(super) fn impl_stat_derive(ast: &DeriveInput) -> TokenStream {
     };
 
     let name = &ast.ident;
-
-    let data = match &ast.data {
-        syn::Data::Struct(data_struct) => data_struct,
-        _ => panic!("Stat can only be derived for structs"),
-    };
-
-    let fields = match &data.fields {
-        syn::Fields::Unnamed(fields_unnamed) => &fields_unnamed.unnamed,
-        _ => panic!("Stat can only be derived for tuple structs with a single f32 field"),
-    };
-
-    if fields.len() != 1 || !fields.iter().all(|f| matches!(f.ty, syn::Type::Path(ref p) if p.path.is_ident("f32"))) {
-        panic!("Stat can only be derived for tuple structs with a single f32 field");
-    }
+    let generics = &ast.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let value_field = find_stat_value_field(&ast);
 
     let gen = quote! {
-        impl Default for #name {
+        impl #impl_generics Default for #name #ty_generics #where_clause {
             fn default() -> Self {
-                Self(0.0)
+                Self { #value_field: 0.0, ..Default::default() }
             }
         }
 
-        impl #crate_ident::Stat for #name {
+        impl #impl_generics #crate_ident::Stat for #name #ty_generics #where_clause {
             fn new(value: f32) -> Self {
-                Self(value)
+                Self { #value_field: value, ..Default::default() }
             }
 
             fn value(&self) -> f32 {
-                self.0
+                self.#value_field
             }
 
             fn value_mut(&mut self) -> &mut f32 {
-                &mut self.0
+                &mut self.#value_field
             }
         }
 
-        impl Into<#name> for f32 {
-            fn into(self) -> #name {
-                #name(self)
+        impl #impl_generics Into<#name #ty_generics> for f32 #where_clause {
+            fn into(self) -> #name #ty_generics {
+                #name::new(self)
             }
         }
 
-        impl std::ops::Deref for #name {
+        impl #impl_generics std::ops::Deref for #name #ty_generics #where_clause {
             type Target = f32;
             fn deref(&self) -> &f32 {
-                &self.0
+                &self.#value_field
             }
         }
     };
     gen.into()
+}
+
+fn find_stat_value_field(ast: &DeriveInput) -> proc_macro2::TokenStream {
+    match &ast.data {
+        syn::Data::Struct(data) => {
+            match &data.fields {
+                // Handle tuple structs: Assumes single f32 field
+                Fields::Unnamed(fields_unnamed) if fields_unnamed.unnamed.len() == 1 => {
+                    let index = syn::Index::from(0);
+                    quote!(#index)
+                }
+                // Handle named fields that might be annotated or using single named field
+                Fields::Named(fields_named) => fields_named
+                    .named
+                    .iter()
+                    .find_map(|f| {
+                        if f.attrs.iter().any(|a| a.path().is_ident("stat")) {
+                            f.ident.as_ref().map(|ident| quote!(#ident))
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_else(|| {
+                        panic!("No field marked with #[stat(value)] and structure is not a simple tuple struct")
+                    }),
+                _ => panic!("Stat can only be derived for structs with exactly one field"),
+            }
+        }
+        _ => panic!("Stat can only be derived for structs"),
+    }
 }

@@ -26,6 +26,7 @@ mod navigation;
 mod physics;
 mod player;
 mod prelude;
+mod spells;
 mod stats;
 mod utils;
 
