@@ -13,7 +13,7 @@ pub(crate) use bevy::{
     utils::{intern::Interned, petgraph::matrix_graph::Zero, Duration, HashMap, HashSet, Instant},
 };
 pub(crate) use bevy_xpbd_3d::{math::*, prelude::*};
-pub(crate) use derive_more::From;
+pub(crate) use derive_more::{Display, From};
 pub(crate) use itertools::Itertools;
 pub(crate) use motte_macros::*;
 pub(crate) use rand::prelude::*;

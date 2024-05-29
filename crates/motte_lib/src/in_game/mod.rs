@@ -47,7 +47,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     image_assets: Res<ImageAssets>,
-    glb_assets: Res<GlbAssets>,
+    _glb_assets: Res<GlbAssets>,
     mut asset_image: ResMut<Assets<Image>>,
 ) {
     commands.spawn((
@@ -161,32 +161,32 @@ fn setup(
             CellIndex::default(),
         ));
     }
+    // TODO: agents are now broken??
+    // for i in 0..1 {
+    //     let agent = Agent::Medium; // Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
+    //     let translation = random_point_in_square(50.0);
+    //     let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
+    //     let agent = commands
+    //         .spawn((
+    //             Name::unit(format!("agent {i}")),
+    //             PbrBundle {
+    //                 mesh: meshes
+    //                     .add(Mesh::from(Cylinder { radius: agent.radius(), half_height: agent.height() / 2.0 })),
+    //                 material: materials.add(Color::RED),
+    //                 transform,
+    //                 ..default()
+    //             },
+    //             CharacterMotor::cylinder(agent.height(), agent.radius()),
+    //             pixelate::Snap::translation(),
+    //             agent,
+    //             Speed::base(100.0),
+    //             CellIndex::default(),
+    //             TargetReachedCondition::Distance(1.0),
+    //         ))
+    //         .id();
 
-    for i in 0..5 {
-        let agent = Agent::Medium; // Agent::ALL[thread_rng().gen_range(0..Agent::ALL.len())];
-        let translation = random_point_in_square(50.0);
-        let transform = Vec3::new(translation.x, 1.0, translation.y).into_transform();
-        let agent = commands
-            .spawn((
-                Name::unit(format!("agent {i}")),
-                PbrBundle {
-                    mesh: meshes
-                        .add(Mesh::from(Cylinder { radius: agent.radius(), half_height: agent.height() / 2.0 })),
-                    material: materials.add(Color::RED),
-                    transform,
-                    ..default()
-                },
-                CharacterMotor::cylinder(agent.height(), agent.radius()),
-                pixelate::Snap::translation(),
-                agent,
-                Speed::base(100.0),
-                CellIndex::default(),
-                TargetReachedCondition::Distance(1.0),
-            ))
-            .id();
-
-        commands.entity(agent).insert(Goal::Entity(target));
-    }
+    //     commands.entity(agent).insert(Goal::Entity(target));
+    // }
 }
 
 fn click(

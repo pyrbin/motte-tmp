@@ -3,7 +3,9 @@ use std::marker::ConstParamTy;
 use super::flow_field::{footprint::Footprint, layout::CELL_SIZE, pathing::Goal};
 use crate::{movement::motor::Movement, prelude::*};
 
-#[derive(Component, Default, Debug, ConstParamTy, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[derive(
+    Component, Default, Debug, ConstParamTy, Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
 #[reflect(Component)]
 #[repr(u8)]
 pub enum Agent {
@@ -34,12 +36,6 @@ impl Agent {
 
     pub const fn height(self) -> f32 {
         self.size()
-    }
-}
-
-impl std::fmt::Display for Agent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
     }
 }
 
